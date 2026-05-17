@@ -1,0 +1,12 @@
+{
+  "id": "ej14_pi_analisis",
+  "descripcion": "π simétrico dado: R3=500 Ω (serie), R1=1000 Ω (shunt) — determinar Z0 y atenuación (Guía ejercicio 14)",
+  "topologia": "pi_symmetric",
+  "resistencias": { "R3": 500, "R1": 1000 },
+  "esperado": {
+    "Z0": 447.2,
+    "A_dB": 8.36,
+    "K": 2.618
+  },
+  "tolerancia": 0.5
+}

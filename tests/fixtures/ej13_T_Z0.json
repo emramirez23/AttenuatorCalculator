@@ -1,0 +1,26 @@
+[
+  {
+    "id": "ej13a",
+    "descripcion": "T simétrico dado: R1=8 Ω, R3=21 Ω — determinar Z0 (Guía ejercicio 13a)",
+    "topologia": "T_symmetric",
+    "resistencias": { "R1": 8, "R3": 21 },
+    "esperado": { "Z0": 20.0 },
+    "tolerancia": 0.1
+  },
+  {
+    "id": "ej13b",
+    "descripcion": "T simétrico dado: R1=10 Ω, R3=15 Ω — determinar Z0 (Guía ejercicio 13b)",
+    "topologia": "T_symmetric",
+    "resistencias": { "R1": 10, "R3": 15 },
+    "esperado": { "Z0": 20.0 },
+    "tolerancia": 0.1
+  },
+  {
+    "id": "ej13c",
+    "descripcion": "T simétrico dado: R1=200 Ω, R3=56.25 Ω — determinar Z0 (Guía ejercicio 13c)",
+    "topologia": "T_symmetric",
+    "resistencias": { "R1": 200, "R3": 56.25 },
+    "esperado": { "Z0": 250.0 },
+    "tolerancia": 0.5
+  }
+]

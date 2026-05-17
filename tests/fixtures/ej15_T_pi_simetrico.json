@@ -1,0 +1,28 @@
+[
+  {
+    "id": "ej15a_T",
+    "descripcion": "Atenuador T simétrico, 15 dB, Z0 = 500 Ω (Guía ejercicio 15a)",
+    "topologia": "T_symmetric",
+    "Z0": 500,
+    "A_dB": 15,
+    "esperado": {
+      "K": 5.6234,
+      "R1": 349.0,
+      "R3": 183.6
+    },
+    "tolerancia": 0.5
+  },
+  {
+    "id": "ej15b_pi",
+    "descripcion": "Atenuador π simétrico, 15 dB, Z0 = 500 Ω (Guía ejercicio 15b)",
+    "topologia": "pi_symmetric",
+    "Z0": 500,
+    "A_dB": 15,
+    "esperado": {
+      "K": 5.6234,
+      "R3": 1361.4,
+      "R1": 716.3
+    },
+    "tolerancia": 0.5
+  }
+]

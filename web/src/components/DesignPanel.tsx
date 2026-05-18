@@ -88,7 +88,6 @@ export function DesignPanel({ onSteps }: DesignPanelProps) {
     <section className="panel">
       <div className="panel-title">
         <div>
-          <span className="tag">MVP 3</span>
           <h2>{tr.designTitle}</h2>
         </div>
       </div>

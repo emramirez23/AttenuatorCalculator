@@ -82,7 +82,6 @@ export function AnalysisPanel({ onSteps }: AnalysisPanelProps) {
     <section className="panel">
       <div className="panel-title">
         <div>
-          <span className="tag">MVP 4</span>
           <h2>{tr.analysisTitle}</h2>
         </div>
       </div>

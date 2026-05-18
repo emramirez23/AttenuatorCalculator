@@ -76,7 +76,6 @@ export function StepsPanel({ onSteps }: StepsPanelProps) {
     <section className="panel">
       <div className="panel-title">
         <div>
-          <span className="tag">MVP 5</span>
           <h2>{tr.stepsTitle}</h2>
         </div>
       </div>

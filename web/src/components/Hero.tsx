@@ -40,6 +40,16 @@ export function Hero({ theme, onToggleTheme }: HeroProps) {
                 </svg>
                 <span>GitHub</span>
               </a>
+              <a
+                className="social-link"
+                href="mailto:ramirezelias.marcos@gmail.com"
+                aria-label="Enviar email a Elías Ramírez"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                  <path d="M2.4 4.8h19.2c.66 0 1.2.54 1.2 1.2v12c0 .66-.54 1.2-1.2 1.2H2.4c-.66 0-1.2-.54-1.2-1.2V6c0-.66.54-1.2 1.2-1.2Zm9.6 7.78L3.8 6.96V18h16.4V6.96l-8.2 5.62Zm0-1.83 8-5.48H4l8 5.48Z"/>
+                </svg>
+                <span>Email</span>
+              </a>
             </div>
           </div>
         </div>

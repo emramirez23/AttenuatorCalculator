@@ -40,7 +40,6 @@ export function ConversionPanel({ onSteps }: ConversionPanelProps) {
     <section className="panel">
       <div className="panel-title">
         <div>
-          <span className="tag">MVP 1</span>
           <h2>{tr.conversionTitle}</h2>
         </div>
       </div>

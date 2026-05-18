@@ -108,38 +108,6 @@ function escText(s: string): string {
   return out
 }
 
-// Equations in steps are pseudo-code style: "R1 = Z0 · (K-1) / (K+1)".
-// We render them in a verbatim-like style but with the Unicode operators
-// rewritten to TeX so they display nicely.
-function escMath(s: string): string {
-  let out = s
-    .replace(/Ω/g, '\\,\\Omega')
-    .replace(/α/g, '\\alpha')
-    .replace(/β/g, '\\beta')
-    .replace(/π/g, '\\pi')
-    .replace(/Δ/g, '\\Delta')
-    .replace(/²/g, '^{2}')
-    .replace(/³/g, '^{3}')
-    .replace(/₀/g, '_{0}')
-    .replace(/₁/g, '_{1}')
-    .replace(/₂/g, '_{2}')
-    .replace(/₃/g, '_{3}')
-    .replace(/₄/g, '_{4}')
-    .replace(/ₘ/g, '_{m}')
-    .replace(/·/g, '\\cdot')
-    .replace(/×/g, '\\times')
-    .replace(/√/g, '\\sqrt')
-    .replace(/≈/g, '\\approx')
-    .replace(/≥/g, '\\geq')
-    .replace(/≤/g, '\\leq')
-    .replace(/±/g, '\\pm')
-    .replace(/→/g, '\\rightarrow')
-    .replace(/‖/g, '\\parallel')
-    .replace(/∞/g, '\\infty')
-    .replace(/−/g, '-')
-  return out
-}
-
 // Equations are printed inside a verbatim environment, so all characters
 // are taken literally (no LaTeX parsing, no babel active-character issues).
 // We only translate Unicode operators into ASCII fall-backs so the default

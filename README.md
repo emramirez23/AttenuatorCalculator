@@ -2,7 +2,7 @@
 
 Herramienta educativa interactiva para el diseño, simulación y resolución paso a paso de atenuadores de radiofrecuencia (RF) y adaptadores de impedancia de pérdidas mínimas. Este proyecto fue desarrollado para la cátedra de **Teoría de Circuitos II** en la **Universidad Tecnológica Nacional (UTN) - Facultad Regional Avellaneda**.
 
-## 🚀 Características principales
+## Características principales
 
 * **Conversión de Unidades**: Conversión bidireccional inmediata entre dB, factor de atenuación lineal ($K$), y Népers ($Np$).
 * **Diseño de 6 Topologías de Atenuadores**:
@@ -18,7 +18,7 @@ Herramienta educativa interactiva para el diseño, simulación y resolución pas
 
 ---
 
-## 🛠️ Requisitos previos
+## Requisitos previos
 
 * **Python 3.10 o superior** (para el motor de cálculo y backend FastAPI)
 * **Node.js 18 o superior** (para el frontend de React y Vite)
@@ -26,7 +26,7 @@ Herramienta educativa interactiva para el diseño, simulación y resolución pas
 
 ---
 
-## 📂 Estructura del proyecto
+## Estructura del proyecto
 
 ```text
 ├── backend/                 # Backend FastAPI (motor de cálculo del simulador)
@@ -42,7 +42,7 @@ Herramienta educativa interactiva para el diseño, simulación y resolución pas
 
 ---
 
-## 💻 Instrucciones de instalación y ejecución rápida
+## Instrucciones de instalación y ejecución rápida
 
 ### Ejecución automática (Recomendado)
 Simplemente haz doble clic en el archivo **`Abrir Simulador.bat`** en la raíz del proyecto. Este lanzador se encarga de:
@@ -84,7 +84,7 @@ Si prefieres realizar la inicialización manualmente, abre una consola en la ra�
 
 ---
 
-## 🧪 Suite de pruebas
+## Suite de pruebas
 
 Para asegurar la rigurosidad científica y matemática de los cálculos y las identidades del simulador, el proyecto incluye una completa suite de **68 pruebas unitarias** que validan todas las topologías con ejercicios académicos reales.
 
@@ -94,9 +94,3 @@ Para ejecutar los tests de forma manual:
 pytest tests/ -v
 ```
 
----
-
-## 🧑‍💻 Autoría
-* **Desarrollado por**: Elias Ramirez (Estudiante de Ingeniería en Electrónica - UTN Regional Avellaneda)
-* **Cátedra**: Teoría de Circuitos II
-* **Institución**: Universidad Tecnológica Nacional (UTN) - Facultad Regional Avellaneda

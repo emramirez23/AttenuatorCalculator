@@ -5,7 +5,8 @@ import { CircuitSVG } from './CircuitSVG'
 import { useLang } from '../LangContext'
 import { useEscapeKey } from '../hooks/useEscapeKey'
 import { readInitialParams, useShareLink } from '../hooks/usePermalink'
-import { downloadTeX } from '../utils/latex'
+import { usePDFExport } from '../hooks/usePDFExport'
+import { buildCompareTeX, downloadTeX } from '../utils/latex'
 
 interface ComparePanelProps {
   onSteps: (steps: SolutionStep[]) => void
@@ -22,6 +23,7 @@ export function ComparePanel({ onSteps }: ComparePanelProps) {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const { copied, share } = useShareLink('compare')
+  const pdf = usePDFExport()
 
   const clearResults = useCallback(() => {
     setResult(null)
@@ -57,22 +59,11 @@ export function ComparePanel({ onSteps }: ComparePanelProps) {
   function handleShare() { share({ Z0, dB, Pin }) }
   function handleExportTeX() {
     if (!result) return
-    const lines: string[] = []
-    lines.push('\\documentclass[11pt,a4paper]{article}')
-    lines.push('\\usepackage[T1]{fontenc}\\usepackage[utf8]{inputenc}\\usepackage[spanish]{babel}')
-    lines.push('\\usepackage[margin=2cm]{geometry}\\usepackage{amsmath,amssymb}\\usepackage{circuitikz}\\usepackage{longtable}')
-    lines.push('\\title{Comparador de topologías}\\author{Simulador de Atenuadores --- UTN FRA}\\date{\\today}')
-    lines.push('\\begin{document}\\maketitle')
-    lines.push(`Z$_0$ = ${result.Z0}\\,$\\Omega$, A = ${result.attenuation_dB}\\,dB, K = ${result.K.toFixed(4)}, P$_{in}$ = ${result.P_in}\\,W\\par`)
-    lines.push('\\begin{tabular}{|l|l|c|c|}\\hline')
-    lines.push('Topología & Resistores & Max R ($\\Omega$) & P disipada (W)\\\\\\hline')
-    for (const r of result.results) {
-      const rs = Object.entries(r.resistors).map(([k, v]) => `${k}=${isFinite(v) ? v.toFixed(2) : '$\\infty$'}\\,$\\Omega$`).join(', ')
-      lines.push(`${r.topology.replace('_', '\\_')} & ${rs} & ${r.maxR.toFixed(2)} & ${r.P_dissipated.toFixed(4)}\\\\\\hline`)
-    }
-    lines.push('\\end{tabular}')
-    lines.push('\\end{document}')
-    downloadTeX('comparador.tex', lines.join('\n'))
+    downloadTeX('comparador.tex', buildCompareTeX(result))
+  }
+  function handleExportPDF() {
+    if (!result) return
+    pdf.exportPDF(buildCompareTeX(result), 'comparador.pdf')
   }
 
   return (
@@ -88,9 +79,17 @@ export function ComparePanel({ onSteps }: ComparePanelProps) {
           <button type="button" className="ghost compact" onClick={handleExportTeX} disabled={!result}>
             {tr.exportTexBtn}
           </button>
+          <button type="button" className="ghost compact" onClick={handleExportPDF} disabled={!result || pdf.loading}>
+            {pdf.loading ? <><span className="spinner" />{tr.exportingPdf}</> : tr.exportPdfBtn}
+          </button>
         </div>
       </div>
       <div className="panel-body">
+        {pdf.error && (
+          <div className="error-box" onClick={pdf.dismissError} style={{ cursor: 'pointer' }}>
+            <strong>{tr.pdfError}:</strong> {pdf.error}
+          </div>
+        )}
         <p className="panel-lead">{tr.compareLead}</p>
         <form onSubmit={handleSubmit}>
           <div className="form-grid">

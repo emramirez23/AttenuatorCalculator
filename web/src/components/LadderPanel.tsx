@@ -4,7 +4,8 @@ import type { SolutionStep } from '../types'
 import { useLang } from '../LangContext'
 import { useEscapeKey } from '../hooks/useEscapeKey'
 import { readInitialParams, useShareLink } from '../hooks/usePermalink'
-import { downloadTeX } from '../utils/latex'
+import { usePDFExport } from '../hooks/usePDFExport'
+import { buildLadderTeX, downloadTeX } from '../utils/latex'
 
 type CellType = LadderDesignParams['cellType']
 
@@ -31,6 +32,7 @@ export function LadderPanel({ onSteps }: LadderPanelProps) {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const { copied, share } = useShareLink('ladder')
+  const pdf = usePDFExport()
 
   const clearResults = useCallback(() => {
     setResult(null)
@@ -64,32 +66,11 @@ export function LadderPanel({ onSteps }: LadderPanelProps) {
   function handleShare() { share({ cellType, Z0, list: dbStr }) }
   function handleExportTeX() {
     if (!result) return
-    const lines: string[] = []
-    lines.push('\\documentclass[11pt,a4paper]{article}')
-    lines.push('\\usepackage[T1]{fontenc}\\usepackage[utf8]{inputenc}\\usepackage[spanish]{babel}')
-    lines.push('\\usepackage[margin=2cm]{geometry}\\usepackage{amsmath,amssymb}\\usepackage{circuitikz}\\usepackage{longtable}')
-    lines.push(`\\title{Atenuador en escalera --- ${result.cellType === 'T_symmetric' ? 'celdas T' : 'celdas $\\pi$'}}`)
-    lines.push('\\author{Simulador de Atenuadores --- UTN FRA}\\date{\\today}')
-    lines.push('\\begin{document}\\maketitle')
-    lines.push(`\\section*{Datos}`)
-    lines.push(`Z$_0$ = ${result.Z0}\\,$\\Omega$\\par`)
-    lines.push(`Pasos: ${result.cells.map(c => `${c.dB}\\,dB`).join(', ')}\\par`)
-    lines.push('\\section*{Celdas individuales}')
-    lines.push('\\begin{tabular}{|c|c|c|c|}\\hline')
-    lines.push('Celda & A (dB) & R serie ($\\Omega$) & R shunt ($\\Omega$)\\\\\\hline')
-    for (const c of result.cells) {
-      lines.push(`${c.index} & ${c.dB} & ${fmt(c.R_series)} & ${fmt(c.R_shunt)} \\\\\\hline`)
-    }
-    lines.push('\\end{tabular}')
-    lines.push('\\section*{Red equivalente fusionada}')
-    lines.push('\\begin{tabular}{|c|l|c|}\\hline')
-    lines.push('Tipo & Origen & Valor ($\\Omega$)\\\\\\hline')
-    for (const e of result.network) {
-      lines.push(`${e.kind === 'series' ? 'Serie' : 'Shunt'} & ${e.label.replace(/∥/g, '\\,$\\parallel$\\,')} & ${fmt(e.value)} \\\\\\hline`)
-    }
-    lines.push('\\end{tabular}')
-    lines.push('\\end{document}')
-    downloadTeX(`ladder-${result.cellType}.tex`, lines.join('\n'))
+    downloadTeX(`ladder-${result.cellType}.tex`, buildLadderTeX(result))
+  }
+  function handleExportPDF() {
+    if (!result) return
+    pdf.exportPDF(buildLadderTeX(result), `ladder-${result.cellType}.pdf`)
   }
 
   return (
@@ -105,9 +86,17 @@ export function LadderPanel({ onSteps }: LadderPanelProps) {
           <button type="button" className="ghost compact" onClick={handleExportTeX} disabled={!result}>
             {tr.exportTexBtn}
           </button>
+          <button type="button" className="ghost compact" onClick={handleExportPDF} disabled={!result || pdf.loading}>
+            {pdf.loading ? <><span className="spinner" />{tr.exportingPdf}</> : tr.exportPdfBtn}
+          </button>
         </div>
       </div>
       <div className="panel-body">
+        {pdf.error && (
+          <div className="error-box" onClick={pdf.dismissError} style={{ cursor: 'pointer' }}>
+            <strong>{tr.pdfError}:</strong> {pdf.error}
+          </div>
+        )}
         <p className="panel-lead">{tr.ladderLead}</p>
         <form onSubmit={handleSubmit}>
           <div className="form-grid">

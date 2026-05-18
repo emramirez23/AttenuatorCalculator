@@ -5,6 +5,7 @@ import { CircuitSVG } from './CircuitSVG'
 import { useLang } from '../LangContext'
 import { useEscapeKey } from '../hooks/useEscapeKey'
 import { readInitialParams, useShareLink } from '../hooks/usePermalink'
+import { usePDFExport } from '../hooks/usePDFExport'
 import { buildDesignTeX, downloadTeX } from '../utils/latex'
 
 interface DesignPanelProps {
@@ -42,6 +43,7 @@ export function DesignPanel({ onSteps }: DesignPanelProps) {
   const [loading, setLoading] = useState(false)
   const [balanced, setBalanced] = useState(false)
   const { copied, share } = useShareLink('design')
+  const pdf = usePDFExport()
 
   const clearResults = useCallback(() => {
     setResult(null)
@@ -59,6 +61,11 @@ export function DesignPanel({ onSteps }: DesignPanelProps) {
   function handleExportTeX() {
     if (!result) return
     downloadTeX(`diseno-${result.topology}-A${result.attenuation.dB.toFixed(0)}dB.tex`, buildDesignTeX(result, balanced))
+  }
+  function handleExportPDF() {
+    if (!result) return
+    const tex = buildDesignTeX(result, balanced)
+    pdf.exportPDF(tex, `diseno-${result.topology}-A${result.attenuation.dB.toFixed(0)}dB.pdf`)
   }
 
   function handleTopologyChange(t: Topology) {
@@ -122,9 +129,17 @@ export function DesignPanel({ onSteps }: DesignPanelProps) {
           <button type="button" className="ghost compact" onClick={handleExportTeX} disabled={!result}>
             {tr.exportTexBtn}
           </button>
+          <button type="button" className="ghost compact" onClick={handleExportPDF} disabled={!result || pdf.loading}>
+            {pdf.loading ? <><span className="spinner" />{tr.exportingPdf}</> : tr.exportPdfBtn}
+          </button>
         </div>
       </div>
       <div className="panel-body">
+        {pdf.error && (
+          <div className="error-box" onClick={pdf.dismissError} style={{ cursor: 'pointer' }}>
+            <strong>{tr.pdfError}:</strong> {pdf.error}
+          </div>
+        )}
         <form onSubmit={handleSubmit}>
           <div className="form-grid">
             <label style={{ gridColumn: '1 / -1' }}>

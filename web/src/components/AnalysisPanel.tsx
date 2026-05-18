@@ -6,6 +6,7 @@ import { CircuitSVG } from './CircuitSVG'
 import { useLang } from '../LangContext'
 import { useEscapeKey } from '../hooks/useEscapeKey'
 import { readInitialParams, useShareLink } from '../hooks/usePermalink'
+import { usePDFExport } from '../hooks/usePDFExport'
 import { buildAnalysisTeX, downloadTeX } from '../utils/latex'
 
 interface AnalysisPanelProps {
@@ -50,6 +51,7 @@ export function AnalysisPanel({ onSteps }: AnalysisPanelProps) {
   const [loading, setLoading] = useState(false)
   const [balanced, setBalanced] = useState(false)
   const { copied, share } = useShareLink('analyze')
+  const pdf = usePDFExport()
 
   const clearResults = useCallback(() => {
     setResult(null)
@@ -66,6 +68,10 @@ export function AnalysisPanel({ onSteps }: AnalysisPanelProps) {
   function handleExportTeX() {
     if (!result) return
     downloadTeX(`analisis-${result.topology}.tex`, buildAnalysisTeX(result, balanced))
+  }
+  function handleExportPDF() {
+    if (!result) return
+    pdf.exportPDF(buildAnalysisTeX(result, balanced), `analisis-${result.topology}.pdf`)
   }
 
   function handleTopologyChange(t: Topology) {
@@ -122,9 +128,17 @@ export function AnalysisPanel({ onSteps }: AnalysisPanelProps) {
           <button type="button" className="ghost compact" onClick={handleExportTeX} disabled={!result}>
             {tr.exportTexBtn}
           </button>
+          <button type="button" className="ghost compact" onClick={handleExportPDF} disabled={!result || pdf.loading}>
+            {pdf.loading ? <><span className="spinner" />{tr.exportingPdf}</> : tr.exportPdfBtn}
+          </button>
         </div>
       </div>
       <div className="panel-body">
+        {pdf.error && (
+          <div className="error-box" onClick={pdf.dismissError} style={{ cursor: 'pointer' }}>
+            <strong>{tr.pdfError}:</strong> {pdf.error}
+          </div>
+        )}
         <p className="panel-lead">{tr.analysisLead}</p>
         <form onSubmit={handleSubmit}>
           <div className="form-grid">

@@ -6,6 +6,7 @@ import { CircuitSVG } from './CircuitSVG'
 import { useLang } from '../LangContext'
 import { useEscapeKey } from '../hooks/useEscapeKey'
 import { readInitialParams, useShareLink } from '../hooks/usePermalink'
+import { usePDFExport } from '../hooks/usePDFExport'
 import { buildStepsTeX, downloadTeX } from '../utils/latex'
 
 type StepsTopology = StepsDesignParams['topology']
@@ -35,6 +36,7 @@ export function StepsPanel({ onSteps }: StepsPanelProps) {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const { copied, share } = useShareLink('steps')
+  const pdf = usePDFExport()
 
   const clearResults = useCallback(() => {
     setResult(null)
@@ -51,6 +53,10 @@ export function StepsPanel({ onSteps }: StepsPanelProps) {
   function handleExportTeX() {
     if (!result) return
     downloadTeX(`pasos-${result.topology}.tex`, buildStepsTeX(result))
+  }
+  function handleExportPDF() {
+    if (!result) return
+    pdf.exportPDF(buildStepsTeX(result), `pasos-${result.topology}.pdf`)
   }
 
   function handleTopologyChange(t: StepsTopology) {
@@ -108,9 +114,17 @@ export function StepsPanel({ onSteps }: StepsPanelProps) {
           <button type="button" className="ghost compact" onClick={handleExportTeX} disabled={!result}>
             {tr.exportTexBtn}
           </button>
+          <button type="button" className="ghost compact" onClick={handleExportPDF} disabled={!result || pdf.loading}>
+            {pdf.loading ? <><span className="spinner" />{tr.exportingPdf}</> : tr.exportPdfBtn}
+          </button>
         </div>
       </div>
       <div className="panel-body">
+        {pdf.error && (
+          <div className="error-box" onClick={pdf.dismissError} style={{ cursor: 'pointer' }}>
+            <strong>{tr.pdfError}:</strong> {pdf.error}
+          </div>
+        )}
         <p className="panel-lead">{tr.stepsLead}</p>
         <form onSubmit={handleSubmit}>
           <div className="form-grid">

@@ -4,6 +4,7 @@ import type { AttenuationValues, SolutionStep } from '../types'
 import { useLang } from '../LangContext'
 import { useEscapeKey } from '../hooks/useEscapeKey'
 import { readInitialParams, useShareLink } from '../hooks/usePermalink'
+import { usePDFExport } from '../hooks/usePDFExport'
 import { buildConversionTeX, downloadTeX } from '../utils/latex'
 
 interface ConversionPanelProps {
@@ -20,6 +21,7 @@ export function ConversionPanel({ onSteps }: ConversionPanelProps) {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const { copied, share } = useShareLink('convert')
+  const pdf = usePDFExport()
 
   const clearResults = useCallback(() => {
     setResult(null)
@@ -34,6 +36,11 @@ export function ConversionPanel({ onSteps }: ConversionPanelProps) {
     if (!result) return
     const tex = buildConversionTeX(parseFloat(value), unit, result)
     downloadTeX(`conversion-${unit}-${value}.tex`, tex)
+  }
+  function handleExportPDF() {
+    if (!result) return
+    const tex = buildConversionTeX(parseFloat(value), unit, result)
+    pdf.exportPDF(tex, `conversion-${unit}-${value}.pdf`)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -70,9 +77,17 @@ export function ConversionPanel({ onSteps }: ConversionPanelProps) {
           <button type="button" className="ghost compact" onClick={handleExportTeX} disabled={!result}>
             {tr.exportTexBtn}
           </button>
+          <button type="button" className="ghost compact" onClick={handleExportPDF} disabled={!result || pdf.loading}>
+            {pdf.loading ? <><span className="spinner" />{tr.exportingPdf}</> : tr.exportPdfBtn}
+          </button>
         </div>
       </div>
       <div className="panel-body">
+        {pdf.error && (
+          <div className="error-box" onClick={pdf.dismissError} style={{ cursor: 'pointer' }}>
+            <strong>{tr.pdfError}:</strong> {pdf.error}
+          </div>
+        )}
         <form onSubmit={handleSubmit}>
           <div className="form-grid">
             <label>

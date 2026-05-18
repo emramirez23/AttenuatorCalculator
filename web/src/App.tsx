@@ -2,10 +2,16 @@ import { useEffect, useState } from 'react'
 import { Hero } from './components/Hero'
 import { ConversionPanel } from './components/ConversionPanel'
 import { DesignPanel } from './components/DesignPanel'
+import { AnalysisPanel } from './components/AnalysisPanel'
+import { StepsPanel } from './components/StepsPanel'
 import { StepsOutput } from './components/StepsOutput'
+import { LangContext } from './LangContext'
+import { translations } from './i18n'
+import type { Lang } from './i18n'
 import type { SolutionStep } from './types'
 
 type Theme = 'light' | 'dark'
+type StepsType = 'conversion' | 'design' | 'analysis' | 'steps'
 
 function getInitialTheme(): Theme {
   if (typeof window !== 'undefined') {
@@ -16,38 +22,49 @@ function getInitialTheme(): Theme {
   return 'light'
 }
 
+function getInitialLang(): Lang {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem('lang') as Lang | null
+    if (stored === 'es' || stored === 'en') return stored
+  }
+  return 'es'
+}
+
 export default function App() {
   const [theme, setTheme] = useState<Theme>(getInitialTheme)
+  const [lang, setLang] = useState<Lang>(getInitialLang)
   const [steps, setSteps] = useState<SolutionStep[]>([])
-  const [stepsTitle, setStepsTitle] = useState('Resolución paso a paso')
+  const [stepsType, setStepsType] = useState<StepsType>('design')
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : '')
     localStorage.setItem('theme', theme)
   }, [theme])
 
+  useEffect(() => {
+    localStorage.setItem('lang', lang)
+  }, [lang])
+
   function toggleTheme() {
     setTheme(t => (t === 'dark' ? 'light' : 'dark'))
   }
 
-  function handleConversionSteps(s: SolutionStep[]) {
-    setSteps(s)
-    setStepsTitle('Conversión de unidades — Resolución')
+  function toggleLang() {
+    setLang(l => (l === 'es' ? 'en' : 'es'))
   }
 
-  function handleDesignSteps(s: SolutionStep[]) {
-    setSteps(s)
-    setStepsTitle('Diseño de atenuador — Resolución')
-  }
+  const tr = translations[lang]
 
   return (
-    <>
+    <LangContext.Provider value={{ lang, tr, toggleLang }}>
       <Hero theme={theme} onToggleTheme={toggleTheme} />
       <main className="workspace">
-        <ConversionPanel onSteps={handleConversionSteps} />
-        <DesignPanel onSteps={handleDesignSteps} />
-        <StepsOutput steps={steps} title={stepsTitle} />
+        <ConversionPanel onSteps={s => { setSteps(s); setStepsType('conversion') }} />
+        <DesignPanel    onSteps={s => { setSteps(s); setStepsType('design') }} />
+        <AnalysisPanel  onSteps={s => { setSteps(s); setStepsType('analysis') }} />
+        <StepsPanel     onSteps={s => { setSteps(s); setStepsType('steps') }} />
+        <StepsOutput steps={steps} stepsType={stepsType} />
       </main>
-    </>
+    </LangContext.Provider>
   )
 }

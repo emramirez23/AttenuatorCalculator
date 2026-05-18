@@ -690,3 +690,469 @@ function designTBridged(Z0: number, att: AttenuationValues): DesignResult {
     warnings
   }
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+//   MVP 4: Análisis directo — Dado resistencias, calcular Z₀/Z₁/Z₂ y A en dB
+// ═════════════════════════════════════════════════════════════════════════════
+
+export interface AnalysisParams {
+  topology: Topology
+  resistors: Record<string, number>
+}
+
+export interface AnalysisResult {
+  topology: string
+  resistors: Record<string, number>
+  Z_in: number
+  Z_out: number
+  attenuation: AttenuationValues
+  steps: SolutionStep[]
+  warnings: string[]
+}
+
+function _attFromK(K: number): AttenuationValues {
+  const dB = 20 * Math.log10(K)
+  const alpha = Math.log(K)
+  return { K, N: K * K, dB, alpha }
+}
+
+export async function analyzeAttenuator(params: AnalysisParams): Promise<AnalysisResult> {
+  const { topology, resistors } = params
+  if (topology === 'T_symmetric')   return analyzeTSym(resistors)
+  if (topology === 'pi_symmetric')  return analyzePiSym(resistors)
+  if (topology === 'T_asymmetric')  return analyzeTAsym(resistors)
+  if (topology === 'pi_asymmetric') return analyzePiAsym(resistors)
+  if (topology === 'L_minloss')     return analyzeL(resistors)
+  if (topology === 'T_bridged')     return analyzeTBridged(resistors)
+  throw new Error(`Topología no soportada: ${topology}`)
+}
+
+function analyzeTSym(r: Record<string, number>): AnalysisResult {
+  const R1 = r['R1'] ?? 0
+  const R3 = r['R3'] ?? 0
+  if (R1 <= 0 || R3 <= 0) throw new Error('R1 y R3 deben ser positivos.')
+
+  const Z0 = Math.sqrt(R1 * (R1 + 2 * R3))
+  const K = (R3 + R1 + Math.sqrt(R1 * (R1 + 2 * R3))) / R3
+  const att = _attFromK(K)
+
+  const steps: SolutionStep[] = [
+    {
+      title: 'Topología: T simétrico — análisis directo',
+      explanation: `Dadas R1 = ${R1} Ω (brazos serie iguales) y R3 = ${R3} Ω (derivación), se calcula la impedancia característica Z₀ y la atenuación A.`,
+      equations: [],
+      result: null,
+      warnings: []
+    },
+    {
+      title: 'Cálculo de la impedancia característica',
+      explanation: 'Para T simétrico, la impedancia imagen es:',
+      equations: [
+        `Z₀ = √(R1 · (R1 + 2·R3))`,
+        `Z₀ = √(${R1} · (${R1} + 2×${R3}))`,
+        `Z₀ = √(${R1} · ${(R1 + 2 * R3).toFixed(4)}) = √${(R1 * (R1 + 2 * R3)).toFixed(4)}`,
+        `Z₀ = ${Z0.toFixed(2)} Ω`
+      ],
+      result: `Z₀ = ${Z0.toFixed(2)} Ω`,
+      warnings: []
+    },
+    {
+      title: 'Cálculo de la atenuación',
+      explanation: 'A partir de K = (Z₀ + R1)/(Z₀ − R1) o equivalentemente:',
+      equations: [
+        `K = (R3 + R1 + √(R1·(R1+2R3))) / R3`,
+        `K = (${R3} + ${R1} + ${Z0.toFixed(4)}) / ${R3}`,
+        `K = ${(R3 + R1 + Z0).toFixed(4)} / ${R3} = ${K.toFixed(4)}`,
+        ``,
+        `A = 20·log₁₀(K) = 20·log₁₀(${K.toFixed(4)}) = ${att.dB.toFixed(2)} dB`,
+        `α = ln(K) = ${att.alpha.toFixed(4)} Nepers`
+      ],
+      result: `A = ${att.dB.toFixed(2)} dB  (K = ${K.toFixed(4)})`,
+      warnings: []
+    }
+  ]
+
+  return { topology: 'T_symmetric', resistors: { R1, R3 }, Z_in: Number(Z0.toFixed(4)), Z_out: Number(Z0.toFixed(4)), attenuation: att, steps, warnings: [] }
+}
+
+function analyzePiSym(r: Record<string, number>): AnalysisResult {
+  const R1 = r['R1'] ?? 0
+  const R3 = r['R3'] ?? 0
+  if (R1 <= 0 || R3 <= 0) throw new Error('R1 y R3 deben ser positivos.')
+
+  const Z0 = R1 * Math.sqrt(R3 / (2 * R1 + R3))
+  const K = (R1 + R3 + Math.sqrt(R3 * (2 * R1 + R3))) / R1
+  const att = _attFromK(K)
+
+  const steps: SolutionStep[] = [
+    {
+      title: 'Topología: π simétrico — análisis directo',
+      explanation: `Dadas R3 = ${R3} Ω (brazo serie central) y R1 = ${R1} Ω (derivaciones iguales), se calcula la impedancia característica Z₀ y la atenuación A.`,
+      equations: [],
+      result: null,
+      warnings: []
+    },
+    {
+      title: 'Cálculo de la impedancia característica',
+      explanation: 'Para π simétrico, la impedancia imagen es:',
+      equations: [
+        `Z₀ = R1 · √(R3 / (2·R1 + R3))`,
+        `Z₀ = ${R1} · √(${R3} / ${(2 * R1 + R3).toFixed(4)})`,
+        `Z₀ = ${R1} · √${(R3 / (2 * R1 + R3)).toFixed(4)} = ${R1} · ${Math.sqrt(R3 / (2 * R1 + R3)).toFixed(4)}`,
+        `Z₀ = ${Z0.toFixed(2)} Ω`
+      ],
+      result: `Z₀ = ${Z0.toFixed(2)} Ω`,
+      warnings: []
+    },
+    {
+      title: 'Cálculo de la atenuación',
+      explanation: 'Aplicando la fórmula:',
+      equations: [
+        `K = (R1 + R3 + √(R3·(2R1+R3))) / R1`,
+        `K = (${R1} + ${R3} + √${(R3 * (2 * R1 + R3)).toFixed(4)}) / ${R1}`,
+        `K = ${(R1 + R3 + Math.sqrt(R3 * (2 * R1 + R3))).toFixed(4)} / ${R1} = ${K.toFixed(4)}`,
+        ``,
+        `A = 20·log₁₀(K) = ${att.dB.toFixed(2)} dB`,
+        `α = ln(K) = ${att.alpha.toFixed(4)} Nepers`
+      ],
+      result: `A = ${att.dB.toFixed(2)} dB  (K = ${K.toFixed(4)})`,
+      warnings: []
+    }
+  ]
+
+  return { topology: 'pi_symmetric', resistors: { R1, R3 }, Z_in: Number(Z0.toFixed(4)), Z_out: Number(Z0.toFixed(4)), attenuation: att, steps, warnings: [] }
+}
+
+function analyzeTAsym(r: Record<string, number>): AnalysisResult {
+  const R1 = r['R1'] ?? 0
+  const R2 = r['R2'] ?? 0
+  const R3 = r['R3'] ?? 0
+  if (R1 <= 0 || R2 <= 0 || R3 <= 0) throw new Error('R1, R2 y R3 deben ser positivos.')
+
+  // ABCD T network (Z1=R1, Z3=R3 shunt, Z2=R2)
+  const A = 1 + R1 / R3
+  const B = R1 + R2 + (R1 * R2) / R3
+  const C = 1 / R3
+  const D = 1 + R2 / R3
+  const Z1 = Math.sqrt((A * B) / (C * D))
+  const Z2 = Math.sqrt((D * B) / (C * A))
+  const K = Math.sqrt(A * D) + Math.sqrt(B * C)
+  const att = _attFromK(K)
+
+  const steps: SolutionStep[] = [
+    {
+      title: 'Topología: T asimétrico — análisis directo',
+      explanation: `Dadas R1 = ${R1} Ω, R3 = ${R3} Ω y R2 = ${R2} Ω, se calculan las impedancias imagen Z₁, Z₂ y la atenuación A.`,
+      equations: [],
+      result: null,
+      warnings: []
+    },
+    {
+      title: 'Parámetros ABCD del cuadripolo',
+      explanation: 'Multiplicando las matrices de serie–derivación–serie:',
+      equations: [
+        `A = 1 + R1/R3 = 1 + ${R1}/${R3} = ${A.toFixed(4)}`,
+        `B = R1 + R2 + R1·R2/R3 = ${R1} + ${R2} + ${(R1 * R2 / R3).toFixed(4)} = ${B.toFixed(4)} Ω`,
+        `C = 1/R3 = 1/${R3} = ${C.toFixed(6)} S`,
+        `D = 1 + R2/R3 = 1 + ${R2}/${R3} = ${D.toFixed(4)}`
+      ],
+      result: null,
+      warnings: []
+    },
+    {
+      title: 'Cálculo de impedancias imagen',
+      explanation: 'Aplicando las definiciones de impedancia imagen:',
+      equations: [
+        `Z₁ = √(A·B / (C·D)) = √(${A.toFixed(4)}·${B.toFixed(4)} / (${C.toFixed(6)}·${D.toFixed(4)}))`,
+        `Z₁ = √(${(A * B).toFixed(4)} / ${(C * D).toFixed(6)}) = ${Z1.toFixed(2)} Ω`,
+        ``,
+        `Z₂ = √(D·B / (C·A)) = √(${(D * B).toFixed(4)} / ${(C * A).toFixed(6)}) = ${Z2.toFixed(2)} Ω`
+      ],
+      result: `Z₁ = ${Z1.toFixed(2)} Ω  |  Z₂ = ${Z2.toFixed(2)} Ω`,
+      warnings: []
+    },
+    {
+      title: 'Cálculo de la atenuación',
+      explanation: 'La atenuación imagen está dada por K = √(A·D) + √(B·C):',
+      equations: [
+        `K = √(${(A * D).toFixed(4)}) + √(${(B * C).toFixed(4)}) = ${Math.sqrt(A * D).toFixed(4)} + ${Math.sqrt(B * C).toFixed(4)}`,
+        `K = ${K.toFixed(4)}`,
+        ``,
+        `A = 20·log₁₀(K) = ${att.dB.toFixed(2)} dB`,
+        `α = ln(K) = ${att.alpha.toFixed(4)} Nepers`
+      ],
+      result: `A = ${att.dB.toFixed(2)} dB  (K = ${K.toFixed(4)})`,
+      warnings: []
+    }
+  ]
+
+  return { topology: 'T_asymmetric', resistors: { R1, R3, R2 }, Z_in: Number(Z1.toFixed(4)), Z_out: Number(Z2.toFixed(4)), attenuation: att, steps, warnings: [] }
+}
+
+function analyzePiAsym(r: Record<string, number>): AnalysisResult {
+  const R1 = r['R1'] ?? 0
+  const R2 = r['R2'] ?? 0
+  const R3 = r['R3'] ?? 0
+  if (R1 <= 0 || R2 <= 0 || R3 <= 0) throw new Error('R1, R2 y R3 deben ser positivos.')
+
+  // ABCD π network (Y1 shunt input, Z3 series, Y2 shunt output)
+  const A = 1 + R3 / R2
+  const B = R3
+  const C = 1 / R1 + 1 / R2 + R3 / (R1 * R2)
+  const D = 1 + R3 / R1
+  const Z1 = Math.sqrt((A * B) / (C * D))
+  const Z2 = Math.sqrt((D * B) / (C * A))
+  const K = Math.sqrt(A * D) + Math.sqrt(B * C)
+  const att = _attFromK(K)
+
+  const steps: SolutionStep[] = [
+    {
+      title: 'Topología: π asimétrico — análisis directo',
+      explanation: `Dadas R1 = ${R1} Ω (derivación entrada), R3 = ${R3} Ω (serie) y R2 = ${R2} Ω (derivación salida), se calculan las impedancias imagen Z₁, Z₂ y la atenuación A.`,
+      equations: [],
+      result: null,
+      warnings: []
+    },
+    {
+      title: 'Parámetros ABCD del cuadripolo',
+      explanation: 'Multiplicando las matrices de derivación–serie–derivación:',
+      equations: [
+        `A = 1 + R3/R2 = ${A.toFixed(4)}`,
+        `B = R3 = ${R3} Ω`,
+        `C = 1/R1 + 1/R2 + R3/(R1·R2) = ${(1 / R1).toFixed(6)} + ${(1 / R2).toFixed(6)} + ${(R3 / (R1 * R2)).toFixed(6)} = ${C.toFixed(6)} S`,
+        `D = 1 + R3/R1 = ${D.toFixed(4)}`
+      ],
+      result: null,
+      warnings: []
+    },
+    {
+      title: 'Cálculo de impedancias imagen',
+      explanation: 'Aplicando las definiciones de impedancia imagen:',
+      equations: [
+        `Z₁ = √(A·B / (C·D)) = √(${(A * B).toFixed(4)} / ${(C * D).toFixed(6)}) = ${Z1.toFixed(2)} Ω`,
+        `Z₂ = √(D·B / (C·A)) = √(${(D * B).toFixed(4)} / ${(C * A).toFixed(6)}) = ${Z2.toFixed(2)} Ω`
+      ],
+      result: `Z₁ = ${Z1.toFixed(2)} Ω  |  Z₂ = ${Z2.toFixed(2)} Ω`,
+      warnings: []
+    },
+    {
+      title: 'Cálculo de la atenuación',
+      explanation: 'La atenuación imagen está dada por K = √(A·D) + √(B·C):',
+      equations: [
+        `K = √(${(A * D).toFixed(4)}) + √(${(B * C).toFixed(4)}) = ${Math.sqrt(A * D).toFixed(4)} + ${Math.sqrt(B * C).toFixed(4)}`,
+        `K = ${K.toFixed(4)}`,
+        ``,
+        `A = 20·log₁₀(K) = ${att.dB.toFixed(2)} dB`,
+        `α = ln(K) = ${att.alpha.toFixed(4)} Nepers`
+      ],
+      result: `A = ${att.dB.toFixed(2)} dB  (K = ${K.toFixed(4)})`,
+      warnings: []
+    }
+  ]
+
+  return { topology: 'pi_asymmetric', resistors: { R1, R3, R2 }, Z_in: Number(Z1.toFixed(4)), Z_out: Number(Z2.toFixed(4)), attenuation: att, steps, warnings: [] }
+}
+
+function analyzeL(r: Record<string, number>): AnalysisResult {
+  const Rs = r['Rs'] ?? 0
+  const Rp = r['Rp'] ?? 0
+  if (Rs <= 0 || Rp <= 0) throw new Error('Rs y Rp deben ser positivos.')
+
+  const Z1 = Math.sqrt(Rs * (Rp + Rs))
+  const Z2 = Rp * Math.sqrt(Rs / (Rs + Rp))
+  const K = Math.sqrt(1 + Rs / Rp) + Math.sqrt(Rs / Rp)
+  const att = _attFromK(K)
+
+  const steps: SolutionStep[] = [
+    {
+      title: 'Topología: adaptador L — análisis directo',
+      explanation: `Dadas Rs = ${Rs} Ω (brazo serie) y Rp = ${Rp} Ω (brazo derivación), se calculan las impedancias imagen Z₁ (alta), Z₂ (baja) y la atenuación intrínseca.`,
+      equations: [],
+      result: null,
+      warnings: []
+    },
+    {
+      title: 'Cálculo de impedancias',
+      explanation: 'Aplicando las fórmulas del adaptador L:',
+      equations: [
+        `Z₁ = √(Rs·(Rs+Rp)) = √(${Rs}·${(Rs + Rp).toFixed(4)}) = √${(Rs * (Rs + Rp)).toFixed(4)} = ${Z1.toFixed(2)} Ω  (alta)`,
+        `Z₂ = Rp·√(Rs/(Rs+Rp)) = ${Rp}·√${(Rs / (Rs + Rp)).toFixed(4)} = ${Z2.toFixed(2)} Ω  (baja)`,
+        ``,
+        `Relación n = Z₁/Z₂ = ${(Z1 / Z2).toFixed(4)}`
+      ],
+      result: `Z₁ = ${Z1.toFixed(2)} Ω  |  Z₂ = ${Z2.toFixed(2)} Ω`,
+      warnings: []
+    },
+    {
+      title: 'Cálculo de la atenuación',
+      explanation: 'La atenuación intrínseca del adaptador es:',
+      equations: [
+        `K = √(1 + Rs/Rp) + √(Rs/Rp)`,
+        `K = √${(1 + Rs / Rp).toFixed(4)} + √${(Rs / Rp).toFixed(4)} = ${Math.sqrt(1 + Rs / Rp).toFixed(4)} + ${Math.sqrt(Rs / Rp).toFixed(4)}`,
+        `K = ${K.toFixed(4)}`,
+        ``,
+        `A = 20·log₁₀(K) = ${att.dB.toFixed(2)} dB  (atenuación mínima entre Z₁ y Z₂)`
+      ],
+      result: `A_min = ${att.dB.toFixed(2)} dB  (K = ${K.toFixed(4)})`,
+      warnings: []
+    }
+  ]
+
+  return { topology: 'L_minloss', resistors: { Rs, Rp }, Z_in: Number(Z1.toFixed(4)), Z_out: Number(Z2.toFixed(4)), attenuation: att, steps, warnings: [] }
+}
+
+function analyzeTBridged(r: Record<string, number>): AnalysisResult {
+  const R1 = r['R1'] ?? 0
+  const R2 = r['R2'] ?? 0
+  const R3 = r['R3'] ?? 0
+  const R4 = r['R4'] ?? 0
+  if (R1 <= 0 || R2 <= 0 || R3 <= 0 || R4 <= 0) throw new Error('Todas las resistencias deben ser positivas.')
+
+  const Z0_geom = Math.sqrt(R3 * R4)
+  const Z0_arm = (R1 + R2) / 2
+  const Z0 = Z0_geom
+  const K = 1 + R4 / Z0
+  const att = _attFromK(K)
+  const warnings: string[] = []
+
+  if (Math.abs(R1 - R2) > 1e-6) warnings.push(`R1 = ${R1} Ω ≠ R2 = ${R2} Ω: el T puenteado debe ser simétrico (R1 = R2 = Z₀).`)
+  if (Math.abs(Z0_arm - Z0_geom) > 1e-6 * Z0_geom) warnings.push(`(R1+R2)/2 = ${Z0_arm.toFixed(2)} ≠ √(R3·R4) = ${Z0_geom.toFixed(2)}: red mal balanceada.`)
+
+  const steps: SolutionStep[] = [
+    {
+      title: 'Topología: T puenteado — análisis directo',
+      explanation: `Dadas R1 = ${R1} Ω, R2 = ${R2} Ω (brazos serie), R3 = ${R3} Ω (derivación central) y R4 = ${R4} Ω (puente), se calcula Z₀ y la atenuación A.`,
+      equations: [],
+      result: null,
+      warnings: []
+    },
+    {
+      title: 'Cálculo de la impedancia característica',
+      explanation: 'En T puenteado se cumple la relación R3·R4 = Z₀² (puente balanceado):',
+      equations: [
+        `Z₀ = √(R3 · R4) = √(${R3} × ${R4}) = √${(R3 * R4).toFixed(4)}`,
+        `Z₀ = ${Z0.toFixed(2)} Ω`,
+        ``,
+        `Verificación: R1 = R2 = Z₀ → ${R1} Ω = ${R2} Ω = ${Z0.toFixed(2)} Ω`
+      ],
+      result: `Z₀ = ${Z0.toFixed(2)} Ω`,
+      warnings: []
+    },
+    {
+      title: 'Cálculo de la atenuación',
+      explanation: 'La atenuación se obtiene del puente:',
+      equations: [
+        `K = 1 + R4/Z₀ = 1 + ${R4}/${Z0.toFixed(2)} = 1 + ${(R4 / Z0).toFixed(4)}`,
+        `K = ${K.toFixed(4)}`,
+        ``,
+        `A = 20·log₁₀(K) = ${att.dB.toFixed(2)} dB`
+      ],
+      result: `A = ${att.dB.toFixed(2)} dB  (K = ${K.toFixed(4)})`,
+      warnings
+    }
+  ]
+
+  return { topology: 'T_bridged', resistors: { R1, R2, R3, R4 }, Z_in: Number(Z0.toFixed(4)), Z_out: Number(Z0.toFixed(4)), attenuation: att, steps, warnings }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//   MVP 5: Atenuador por pasos — Lista de valores en dB con misma Z₀
+// ═════════════════════════════════════════════════════════════════════════════
+
+export interface StepsDesignParams {
+  topology: Exclude<Topology, 'L_minloss'>
+  Z0?: number
+  Z1?: number
+  Z2?: number
+  dB_list: number[]
+}
+
+export interface StepCell {
+  dB: number
+  K: number
+  topology: string
+  resistors: Record<string, number>
+  Z_in: number
+  Z_out: number
+  warnings: string[]
+}
+
+export interface StepsDesignResult {
+  topology: string
+  cells: StepCell[]
+  steps: SolutionStep[]
+  warnings: string[]
+}
+
+export async function designSteps(params: StepsDesignParams): Promise<StepsDesignResult> {
+  const { topology, dB_list } = params
+  if (!dB_list || dB_list.length === 0) throw new Error('Ingresá al menos un valor de atenuación.')
+  for (const v of dB_list) {
+    if (!isFinite(v) || v < 0) throw new Error(`Valor inválido en la lista: ${v}. Debe ser ≥ 0.`)
+  }
+
+  const isSym = topology === 'T_symmetric' || topology === 'pi_symmetric' || topology === 'T_bridged'
+  const cells: StepCell[] = []
+  const allWarnings: string[] = []
+
+  if (isSym) {
+    const Z0 = params.Z0 ?? 50
+    if (Z0 <= 0) throw new Error('Z₀ debe ser positivo.')
+    for (const dB of dB_list) {
+      const res = await designAttenuator({ topology, Z0, attenuation_dB: dB })
+      cells.push({
+        dB,
+        K: res.attenuation.K,
+        topology: res.topology,
+        resistors: res.resistors,
+        Z_in: res.Z_in,
+        Z_out: res.Z_out,
+        warnings: res.warnings
+      })
+      if (res.warnings.length > 0) allWarnings.push(...res.warnings.map(w => `${dB} dB: ${w}`))
+    }
+  } else {
+    const Z1 = params.Z1 ?? 50
+    const Z2 = params.Z2 ?? 50
+    if (Z1 <= 0 || Z2 <= 0) throw new Error('Z₁ y Z₂ deben ser positivos.')
+    const Km = _k_min(Z1, Z2)
+    const Am = Km > 1 ? 20 * Math.log10(Km) : 0
+    for (const dB of dB_list) {
+      const res = await designAttenuator({ topology, Z1, Z2, attenuation_dB: dB })
+      cells.push({
+        dB,
+        K: res.attenuation.K,
+        topology: res.topology,
+        resistors: res.resistors,
+        Z_in: res.Z_in,
+        Z_out: res.Z_out,
+        warnings: res.warnings
+      })
+      if (dB < Am - 1e-6) allWarnings.push(`${dB} dB es menor que A_min = ${Am.toFixed(2)} dB: paso no realizable.`)
+    }
+  }
+
+  const summaryEqs: string[] = []
+  for (const c of cells) {
+    const rs = Object.entries(c.resistors)
+      .map(([k, v]) => `${k}=${isFinite(v) ? v.toFixed(2) : '∞'}Ω`).join('  ')
+    summaryEqs.push(`A = ${c.dB} dB  (K = ${c.K.toFixed(4)})  →  ${rs}`)
+  }
+
+  const explanation = isSym
+    ? `Atenuador por pasos en topología ${topology}, con Z₀ = ${params.Z0} Ω. Se diseña un cuadripolo independiente por cada paso solicitado.`
+    : `Atenuador por pasos en topología ${topology}, con Z₁ = ${params.Z1} Ω y Z₂ = ${params.Z2} Ω. Se diseña un cuadripolo independiente por cada paso.`
+
+  const steps: SolutionStep[] = [
+    {
+      title: 'Diseño por pasos',
+      explanation,
+      equations: summaryEqs,
+      result: `${cells.length} paso(s) diseñado(s).`,
+      warnings: allWarnings
+    }
+  ]
+
+  return { topology, cells, steps, warnings: allWarnings }
+}
+

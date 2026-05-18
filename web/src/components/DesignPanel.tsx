@@ -2,18 +2,10 @@ import { useState } from 'react'
 import { designAttenuator, type Topology, type DesignParams } from '../api/client'
 import type { DesignResult, SolutionStep } from '../types'
 import { CircuitSVG } from './CircuitSVG'
+import { useLang } from '../LangContext'
 
 interface DesignPanelProps {
   onSteps: (steps: SolutionStep[]) => void
-}
-
-const TOPOLOGY_LABELS: Record<Topology, string> = {
-  T_symmetric:  'T simétrico',
-  pi_symmetric: 'π simétrico',
-  T_asymmetric:  'T asimétrico',
-  pi_asymmetric: 'π asimétrico',
-  T_bridged:    'T puenteado (bridged)',
-  L_minloss:    'Adaptador L (pérdida mínima)',
 }
 
 function isSymmetric(t: Topology) {
@@ -24,7 +16,17 @@ function needsAttenuation(t: Topology) {
   return t !== 'L_minloss'
 }
 
+function computeAmin(z1str: string, z2str: string): number | null {
+  const z1 = parseFloat(z1str)
+  const z2 = parseFloat(z2str)
+  if (!isFinite(z1) || !isFinite(z2) || z1 <= 0 || z2 <= 0 || Math.abs(z1 - z2) < 1e-9) return null
+  const n = Math.max(z1, z2) / Math.min(z1, z2)
+  const kmin = Math.sqrt(n) + Math.sqrt(n - 1)
+  return 20 * Math.log10(kmin)
+}
+
 export function DesignPanel({ onSteps }: DesignPanelProps) {
+  const { tr } = useLang()
   const [topology, setTopology] = useState<Topology>('T_symmetric')
   const [Z0, setZ0] = useState('500')
   const [Z1, setZ1] = useState('600')
@@ -48,13 +50,13 @@ export function DesignPanel({ onSteps }: DesignPanelProps) {
 
     if (isSymmetric(topology)) {
       const z0Num = parseFloat(Z0)
-      if (isNaN(z0Num) || z0Num <= 0) { setError('Z₀ debe ser un número positivo.'); return }
+      if (isNaN(z0Num) || z0Num <= 0) { setError(tr.errZ0Positive); return }
       params.Z0 = z0Num
     } else {
       const z1Num = parseFloat(Z1)
       const z2Num = parseFloat(Z2)
       if (isNaN(z1Num) || z1Num <= 0 || isNaN(z2Num) || z2Num <= 0) {
-        setError('Z₁ y Z₂ deben ser números positivos.'); return
+        setError(tr.errZ1Z2Positive); return
       }
       params.Z1 = z1Num
       params.Z2 = z2Num
@@ -62,7 +64,7 @@ export function DesignPanel({ onSteps }: DesignPanelProps) {
 
     if (needsAttenuation(topology)) {
       const dbNum = parseFloat(attdB)
-      if (isNaN(dbNum) || dbNum < 0) { setError('La atenuación debe ser ≥ 0 dB.'); return }
+      if (isNaN(dbNum) || dbNum < 0) { setError(tr.errAttPositive); return }
       params.attenuation_dB = dbNum
     }
 
@@ -72,7 +74,7 @@ export function DesignPanel({ onSteps }: DesignPanelProps) {
       setResult(res)
       onSteps(res.steps)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido')
+      setError(err instanceof Error ? err.message : tr.unknownError)
       setResult(null)
     } finally {
       setLoading(false)
@@ -87,17 +89,17 @@ export function DesignPanel({ onSteps }: DesignPanelProps) {
       <div className="panel-title">
         <div>
           <span className="tag">MVP 3</span>
-          <h2>Diseño de atenuador</h2>
+          <h2>{tr.designTitle}</h2>
         </div>
       </div>
       <div className="panel-body">
         <form onSubmit={handleSubmit}>
           <div className="form-grid">
             <label style={{ gridColumn: '1 / -1' }}>
-              Topología
+              {tr.topologyLabel}
               <select value={topology} onChange={e => handleTopologyChange(e.target.value as Topology)}>
-                {(Object.keys(TOPOLOGY_LABELS) as Topology[]).map(t => (
-                  <option key={t} value={t}>{TOPOLOGY_LABELS[t]}</option>
+                {(Object.keys(tr.topologies) as Topology[]).map(t => (
+                  <option key={t} value={t}>{tr.topologies[t]}</option>
                 ))}
               </select>
             </label>
@@ -114,7 +116,7 @@ export function DesignPanel({ onSteps }: DesignPanelProps) {
             ) : (
               <>
                 <label>
-                  Z₁ (Ω) — entrada
+                  {tr.z1InputLabel}
                   <input
                     type="number" step="any" min="0.001"
                     value={Z1} onChange={e => setZ1(e.target.value)}
@@ -122,7 +124,7 @@ export function DesignPanel({ onSteps }: DesignPanelProps) {
                   />
                 </label>
                 <label>
-                  Z₂ (Ω) — salida
+                  {tr.z2OutputLabel}
                   <input
                     type="number" step="any" min="0.001"
                     value={Z2} onChange={e => setZ2(e.target.value)}
@@ -131,6 +133,20 @@ export function DesignPanel({ onSteps }: DesignPanelProps) {
                 </label>
               </>
             )}
+
+            {!sym && (() => {
+              const amin = computeAmin(Z1, Z2)
+              if (amin === null) return null
+              const isLminloss = topology === 'L_minloss'
+              return (
+                <div className="amin-info" style={{ gridColumn: '1 / -1' }}>
+                  <span className="amin-value">A_mín = {amin.toFixed(2)} dB</span>
+                  <span className="amin-caption">
+                    {isLminloss ? tr.aminFixed : tr.aminHelp}
+                  </span>
+                </div>
+              )
+            })()}
 
             {needsAttenuation(topology) && (
               <label>
@@ -144,7 +160,7 @@ export function DesignPanel({ onSteps }: DesignPanelProps) {
             )}
 
             <button type="submit" disabled={loading}>
-              {loading ? <><span className="spinner" />Calculando</> : 'Calcular'}
+              {loading ? <><span className="spinner" />{tr.calculating}</> : tr.calcBtn}
             </button>
           </div>
         </form>
@@ -192,10 +208,10 @@ export function DesignPanel({ onSteps }: DesignPanelProps) {
         {!result && !error && (
           <div className="empty-state">
             {sym
-              ? 'Seleccioná la topología, ingresá Z₀ y la atenuación deseada'
+              ? tr.emptySymmetric
               : topology === 'L_minloss'
-                ? 'Ingresá Z₁ (alta) y Z₂ (baja) — la atenuación mínima se calcula automáticamente'
-                : 'Ingresá Z₁, Z₂ y la atenuación deseada (debe superar la mínima realizable)'
+                ? tr.emptyLminloss
+                : tr.emptyAsymmetric
             }
           </div>
         )}

@@ -1,18 +1,26 @@
 import type { SolutionStep } from '../types'
+import { useLang } from '../LangContext'
 
 interface StepsOutputProps {
   steps: SolutionStep[]
-  title?: string
+  stepsType: 'conversion' | 'design' | 'analysis' | 'steps'
 }
 
-export function StepsOutput({ steps, title = 'Resolución paso a paso' }: StepsOutputProps) {
+export function StepsOutput({ steps, stepsType }: StepsOutputProps) {
+  const { tr } = useLang()
   if (steps.length === 0) return null
+
+  const title =
+    stepsType === 'conversion' ? tr.conversionStepsTitle
+    : stepsType === 'analysis' ? tr.analysisStepsTitle
+    : stepsType === 'steps'    ? tr.stepsStepsTitle
+    : tr.designStepsTitle
 
   return (
     <section className="panel steps-panel">
       <div className="panel-title">
         <div>
-          <span className="tag">Resolución</span>
+          <span className="tag">{tr.stepsTag}</span>
           <h2>{title}</h2>
         </div>
       </div>

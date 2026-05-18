@@ -498,6 +498,31 @@ h3 { margin-bottom: 0.35rem; }
   font-weight: 750;
 }
 
+/* ─── A-min info badge ───────────────────────────────── */
+
+.amin-info {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  border: 1px solid rgba(0, 108, 103, 0.25);
+  border-radius: 14px;
+  background: rgba(0, 108, 103, 0.07);
+  padding: 0.55rem 0.85rem;
+}
+
+.amin-value {
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.amin-caption {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
 /* ─── States ─────────────────────────────────────────── */
 
 .error-box {
@@ -540,6 +565,110 @@ h3 { margin-bottom: 0.35rem; }
   animation: spin 0.6s linear infinite;
   vertical-align: middle;
   margin-right: 0.4rem;
+}
+
+/* ─── Lead / descripción de panel ─────────────────────── */
+
+.panel-lead {
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+/* ─── Cells grid (MVP 5: por pasos) ─────────────────── */
+
+.cells-title {
+  margin: 1.25rem 0 0.6rem;
+  font-size: 1.02rem;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.cells-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.9rem;
+}
+
+.cell-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.9rem 1rem;
+  background: var(--soft-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.cell-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.cell-tag {
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-weight: 700;
+  color: var(--accent-2);
+  font-size: 0.95rem;
+}
+
+.cell-k {
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.cell-resistors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.cell-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  padding: 0.22rem 0.55rem;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--card-bg);
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-size: 0.82rem;
+}
+
+.cell-chip-name {
+  color: var(--accent-2);
+  font-weight: 700;
+}
+
+.cell-chip-val {
+  color: var(--ink);
+}
+
+.cell-chip-unit {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.cell-circuit {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(90deg, var(--schematic-grid) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(var(--schematic-grid) 1px, transparent 1px) 0 0 / 24px 24px,
+    var(--schematic-bg);
+  padding: 0.6rem 0.6rem;
+}
+
+.cell-circuit svg {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 /* ─── Responsive ─────────────────────────────────────── */

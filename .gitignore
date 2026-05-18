@@ -27,6 +27,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Claude Code agent state (worktrees, launch configs)
+.claude/
+
 # Editor specific files and settings
 .vscode/
 !.vscode/extensions.json

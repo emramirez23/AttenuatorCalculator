@@ -1,9 +1,13 @@
+import { useLang } from '../LangContext'
+
 interface HeroProps {
   theme: 'light' | 'dark'
   onToggleTheme: () => void
 }
 
 export function Hero({ theme, onToggleTheme }: HeroProps) {
+  const { tr, toggleLang } = useLang()
+
   return (
     <header className="hero">
       <div>
@@ -39,12 +43,9 @@ export function Hero({ theme, onToggleTheme }: HeroProps) {
             </div>
           </div>
         </div>
-        <p className="eyebrow">Teoría de Circuitos II · UTN</p>
-        <h1>Simulador de Atenuadores</h1>
-        <p className="lead">
-          Calculá resistencias para atenuadores T y π simétricos y asimétricos, adaptadores tipo L
-          de pérdida mínima, T puenteado, convertí unidades de atenuación y seguí la resolución paso a paso.
-        </p>
+        <p className="eyebrow">{tr.eyebrow}</p>
+        <h1>{tr.title}</h1>
+        <p className="lead">{tr.lead}</p>
       </div>
       <div className="hero-card hero-card--controls-only">
         <div className="preference-actions" aria-label="Preferencias">
@@ -54,7 +55,15 @@ export function Hero({ theme, onToggleTheme }: HeroProps) {
             onClick={onToggleTheme}
             aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
           >
-            {theme === 'dark' ? '☀ Claro' : '☾ Oscuro'}
+            {theme === 'dark' ? tr.themeLight : tr.themeDark}
+          </button>
+          <button
+            className="secondary compact"
+            type="button"
+            onClick={toggleLang}
+            aria-label="Switch language"
+          >
+            {tr.langToggle}
           </button>
         </div>
       </div>

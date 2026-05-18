@@ -1,8 +1,11 @@
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { designAttenuator, type Topology, type DesignParams } from '../api/client'
 import type { DesignResult, SolutionStep } from '../types'
 import { CircuitSVG } from './CircuitSVG'
 import { useLang } from '../LangContext'
+import { useEscapeKey } from '../hooks/useEscapeKey'
+import { readInitialParams, useShareLink } from '../hooks/usePermalink'
+import { buildDesignTeX, downloadTeX } from '../utils/latex'
 
 interface DesignPanelProps {
   onSteps: (steps: SolutionStep[]) => void
@@ -27,14 +30,36 @@ function computeAmin(z1str: string, z2str: string): number | null {
 
 export function DesignPanel({ onSteps }: DesignPanelProps) {
   const { tr } = useLang()
-  const [topology, setTopology] = useState<Topology>('T_symmetric')
-  const [Z0, setZ0] = useState('500')
-  const [Z1, setZ1] = useState('600')
-  const [Z2, setZ2] = useState('100')
-  const [attdB, setAttdB] = useState('15')
+  const sectionRef = useRef<HTMLElement | null>(null)
+  const initial = readInitialParams('design')
+  const [topology, setTopology] = useState<Topology>(((initial?.topology as Topology) ?? 'T_symmetric'))
+  const [Z0, setZ0] = useState(initial?.Z0 ?? '500')
+  const [Z1, setZ1] = useState(initial?.Z1 ?? '600')
+  const [Z2, setZ2] = useState(initial?.Z2 ?? '100')
+  const [attdB, setAttdB] = useState(initial?.dB ?? '15')
   const [result, setResult] = useState<DesignResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [balanced, setBalanced] = useState(false)
+  const { copied, share } = useShareLink('design')
+
+  const clearResults = useCallback(() => {
+    setResult(null)
+    setError(null)
+    setBalanced(false)
+    onSteps([])
+  }, [onSteps])
+
+  useEscapeKey(clearResults, sectionRef)
+
+  function handleShare() {
+    const sym = isSymmetric(topology)
+    share({ topology, Z0: sym ? Z0 : undefined, Z1: !sym ? Z1 : undefined, Z2: !sym ? Z2 : undefined, dB: needsAttenuation(topology) ? attdB : undefined })
+  }
+  function handleExportTeX() {
+    if (!result) return
+    downloadTeX(`diseno-${result.topology}-A${result.attenuation.dB.toFixed(0)}dB.tex`, buildDesignTeX(result, balanced))
+  }
 
   function handleTopologyChange(t: Topology) {
     setTopology(t)
@@ -85,10 +110,18 @@ export function DesignPanel({ onSteps }: DesignPanelProps) {
   const sym = isSymmetric(topology)
 
   return (
-    <section className="panel">
+    <section className="panel" ref={sectionRef}>
       <div className="panel-title">
         <div>
           <h2>{tr.designTitle}</h2>
+        </div>
+        <div className="panel-actions">
+          <button type="button" className="ghost compact" onClick={handleShare}>
+            {copied ? tr.copied : tr.shareBtn}
+          </button>
+          <button type="button" className="ghost compact" onClick={handleExportTeX} disabled={!result}>
+            {tr.exportTexBtn}
+          </button>
         </div>
       </div>
       <div className="panel-body">
@@ -185,6 +218,16 @@ export function DesignPanel({ onSteps }: DesignPanelProps) {
                 </div>
               ))}
             </div>
+
+            {result.topology !== 'T_bridged' && (
+              <div className="balanced-toggle" role="group" aria-label="Versión del circuito">
+                <button type="button" className={balanced ? '' : 'is-on'} onClick={() => setBalanced(false)}>{tr.unbalancedToggle}</button>
+                <button type="button" className={balanced ? 'is-on' : ''} onClick={() => setBalanced(true)}>{tr.balancedToggle}</button>
+              </div>
+            )}
+            {balanced && result.topology !== 'T_bridged' && (
+              <p className="balanced-note">{tr.balancedNote}</p>
+            )}
 
             <div className="circuit-container">
               <CircuitSVG

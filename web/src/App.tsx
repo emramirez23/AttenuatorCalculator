@@ -4,6 +4,8 @@ import { ConversionPanel } from './components/ConversionPanel'
 import { DesignPanel } from './components/DesignPanel'
 import { AnalysisPanel } from './components/AnalysisPanel'
 import { StepsPanel } from './components/StepsPanel'
+import { LadderPanel } from './components/LadderPanel'
+import { ComparePanel } from './components/ComparePanel'
 import { StepsOutput } from './components/StepsOutput'
 import { LangContext } from './LangContext'
 import { translations } from './i18n'
@@ -11,7 +13,7 @@ import type { Lang } from './i18n'
 import type { SolutionStep } from './types'
 
 type Theme = 'light' | 'dark'
-type StepsType = 'conversion' | 'design' | 'analysis' | 'steps'
+type StepsType = 'conversion' | 'design' | 'analysis' | 'steps' | 'ladder' | 'compare'
 
 function getInitialTheme(): Theme {
   if (typeof window !== 'undefined') {
@@ -63,6 +65,8 @@ export default function App() {
         <DesignPanel    onSteps={s => { setSteps(s); setStepsType('design') }} />
         <AnalysisPanel  onSteps={s => { setSteps(s); setStepsType('analysis') }} />
         <StepsPanel     onSteps={s => { setSteps(s); setStepsType('steps') }} />
+        <LadderPanel    onSteps={s => { setSteps(s); setStepsType('ladder') }} />
+        <ComparePanel   onSteps={s => { setSteps(s); setStepsType('compare') }} />
         <StepsOutput steps={steps} stepsType={stepsType} />
       </main>
     </LangContext.Provider>

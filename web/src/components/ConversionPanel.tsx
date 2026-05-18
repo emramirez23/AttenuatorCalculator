@@ -1,7 +1,10 @@
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { convertAttenuation, type Unit } from '../api/client'
 import type { AttenuationValues, SolutionStep } from '../types'
 import { useLang } from '../LangContext'
+import { useEscapeKey } from '../hooks/useEscapeKey'
+import { readInitialParams, useShareLink } from '../hooks/usePermalink'
+import { buildConversionTeX, downloadTeX } from '../utils/latex'
 
 interface ConversionPanelProps {
   onSteps: (steps: SolutionStep[]) => void
@@ -9,11 +12,29 @@ interface ConversionPanelProps {
 
 export function ConversionPanel({ onSteps }: ConversionPanelProps) {
   const { tr } = useLang()
-  const [value, setValue] = useState('15')
-  const [unit, setUnit] = useState<Unit>('dB')
+  const sectionRef = useRef<HTMLElement | null>(null)
+  const initial = readInitialParams('convert')
+  const [value, setValue] = useState(initial?.value ?? '15')
+  const [unit, setUnit] = useState<Unit>(((initial?.unit as Unit) ?? 'dB'))
   const [result, setResult] = useState<AttenuationValues | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const { copied, share } = useShareLink('convert')
+
+  const clearResults = useCallback(() => {
+    setResult(null)
+    setError(null)
+    onSteps([])
+  }, [onSteps])
+
+  useEscapeKey(clearResults, sectionRef)
+
+  function handleShare() { share({ value, unit }) }
+  function handleExportTeX() {
+    if (!result) return
+    const tex = buildConversionTeX(parseFloat(value), unit, result)
+    downloadTeX(`conversion-${unit}-${value}.tex`, tex)
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -37,10 +58,18 @@ export function ConversionPanel({ onSteps }: ConversionPanelProps) {
   }
 
   return (
-    <section className="panel">
+    <section className="panel" ref={sectionRef}>
       <div className="panel-title">
         <div>
           <h2>{tr.conversionTitle}</h2>
+        </div>
+        <div className="panel-actions">
+          <button type="button" className="ghost compact" onClick={handleShare}>
+            {copied ? tr.copied : tr.shareBtn}
+          </button>
+          <button type="button" className="ghost compact" onClick={handleExportTeX} disabled={!result}>
+            {tr.exportTexBtn}
+          </button>
         </div>
       </div>
       <div className="panel-body">

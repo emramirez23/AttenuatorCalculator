@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { analyzeAttenuator, type Topology } from '../api/client'
 import type { AnalysisResult } from '../api/client'
 import type { SolutionStep } from '../types'
 import { CircuitSVG } from './CircuitSVG'
 import { useLang } from '../LangContext'
+import { useEscapeKey } from '../hooks/useEscapeKey'
+import { readInitialParams, useShareLink } from '../hooks/usePermalink'
+import { buildAnalysisTeX, downloadTeX } from '../utils/latex'
 
 interface AnalysisPanelProps {
   onSteps: (steps: SolutionStep[]) => void
@@ -31,11 +34,39 @@ const defaultValues: Record<string, Record<string, string>> = {
 
 export function AnalysisPanel({ onSteps }: AnalysisPanelProps) {
   const { tr } = useLang()
-  const [topology, setTopology] = useState<Topology>('T_symmetric')
-  const [vals, setVals] = useState<Record<string, string>>(defaultValues['T_symmetric'])
+  const sectionRef = useRef<HTMLElement | null>(null)
+  const initial = readInitialParams('analyze')
+  const initTopology = ((initial?.topology as Topology) ?? 'T_symmetric')
+  const initVals: Record<string, string> = { ...defaultValues[initTopology] }
+  if (initial) {
+    for (const name of fieldNames(initTopology)) {
+      if (initial[name]) initVals[name] = initial[name]
+    }
+  }
+  const [topology, setTopology] = useState<Topology>(initTopology)
+  const [vals, setVals] = useState<Record<string, string>>(initVals)
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [balanced, setBalanced] = useState(false)
+  const { copied, share } = useShareLink('analyze')
+
+  const clearResults = useCallback(() => {
+    setResult(null)
+    setError(null)
+    setBalanced(false)
+    onSteps([])
+  }, [onSteps])
+
+  useEscapeKey(clearResults, sectionRef)
+
+  function handleShare() {
+    share({ topology, ...vals })
+  }
+  function handleExportTeX() {
+    if (!result) return
+    downloadTeX(`analisis-${result.topology}.tex`, buildAnalysisTeX(result, balanced))
+  }
 
   function handleTopologyChange(t: Topology) {
     setTopology(t)
@@ -79,10 +110,18 @@ export function AnalysisPanel({ onSteps }: AnalysisPanelProps) {
   const isL = topology === 'L_minloss'
 
   return (
-    <section className="panel">
+    <section className="panel" ref={sectionRef}>
       <div className="panel-title">
         <div>
           <h2>{tr.analysisTitle}</h2>
+        </div>
+        <div className="panel-actions">
+          <button type="button" className="ghost compact" onClick={handleShare}>
+            {copied ? tr.copied : tr.shareBtn}
+          </button>
+          <button type="button" className="ghost compact" onClick={handleExportTeX} disabled={!result}>
+            {tr.exportTexBtn}
+          </button>
         </div>
       </div>
       <div className="panel-body">
@@ -161,6 +200,16 @@ export function AnalysisPanel({ onSteps }: AnalysisPanelProps) {
                 Z_out={Math.round(result.Z_out)}
               />
             </div>
+
+            {result.topology !== 'T_bridged' && (
+              <div className="balanced-toggle" role="group" aria-label="Versión del circuito">
+                <button type="button" className={balanced ? '' : 'is-on'} onClick={() => setBalanced(false)}>{tr.unbalancedToggle}</button>
+                <button type="button" className={balanced ? 'is-on' : ''} onClick={() => setBalanced(true)}>{tr.balancedToggle}</button>
+              </div>
+            )}
+            {balanced && result.topology !== 'T_bridged' && (
+              <p className="balanced-note">{tr.balancedNote}</p>
+            )}
           </>
         )}
 

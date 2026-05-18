@@ -3,7 +3,7 @@ import { useLang } from '../LangContext'
 
 interface StepsOutputProps {
   steps: SolutionStep[]
-  stepsType: 'conversion' | 'design' | 'analysis' | 'steps'
+  stepsType: 'conversion' | 'design' | 'analysis' | 'steps' | 'ladder' | 'compare'
 }
 
 export function StepsOutput({ steps, stepsType }: StepsOutputProps) {
@@ -14,6 +14,8 @@ export function StepsOutput({ steps, stepsType }: StepsOutputProps) {
     stepsType === 'conversion' ? tr.conversionStepsTitle
     : stepsType === 'analysis' ? tr.analysisStepsTitle
     : stepsType === 'steps'    ? tr.stepsStepsTitle
+    : stepsType === 'ladder'   ? tr.ladderStepsTitle
+    : stepsType === 'compare'  ? tr.compareStepsTitle
     : tr.designStepsTitle
 
   return (

@@ -334,10 +334,14 @@ h3 { margin-bottom: 0.35rem; }
   padding: 0.85rem;
   background: var(--card-bg);
   display: grid;
-  gap: 0.15rem;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.4rem;
+  row-gap: 0.15rem;
+  align-items: baseline;
 }
 
 .val-label {
+  grid-column: 1 / -1;
   font-size: 0.75rem;
   font-weight: 850;
   color: var(--muted);
@@ -355,6 +359,7 @@ h3 { margin-bottom: 0.35rem; }
 .val-unit {
   font-size: 0.8rem;
   color: var(--muted);
+  text-align: left;
 }
 
 /* ─── Design result ─────────────────────────────────── */
@@ -367,15 +372,19 @@ h3 { margin-bottom: 0.35rem; }
 
 .resistor-chip {
   display: grid;
-  gap: 0.1rem;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.45rem;
+  row-gap: 0.15rem;
   border: 2px solid var(--accent);
   border-radius: 18px;
-  padding: 0.8rem 1.2rem;
+  padding: 0.7rem 1.1rem;
   background: rgba(0, 108, 103, 0.06);
-  min-width: 110px;
+  min-width: 130px;
+  align-items: baseline;
 }
 
 .chip-label {
+  grid-column: 1 / -1;
   font-size: 0.75rem;
   font-weight: 850;
   color: var(--accent-2);
@@ -392,7 +401,8 @@ h3 { margin-bottom: 0.35rem; }
 }
 
 .chip-unit {
-  font-size: 0.82rem;
+  font-size: 0.95rem;
+  font-weight: 600;
   color: var(--muted);
 }
 
@@ -567,6 +577,86 @@ h3 { margin-bottom: 0.35rem; }
   margin-right: 0.4rem;
 }
 
+/* ─── Panel actions row (share / latex / balanced) ────── */
+
+.panel-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+button.ghost {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+}
+
+button.ghost:hover:not(:disabled) {
+  background: rgba(0, 108, 103, 0.08);
+}
+
+button.ghost:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+button.ghost.is-active {
+  background: var(--accent);
+  color: var(--button-text);
+}
+
+.balanced-toggle {
+  display: inline-flex;
+  margin: 0.8rem 0 0.4rem;
+  gap: 0;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 0.18rem;
+  background: var(--card-bg);
+}
+
+.balanced-toggle button {
+  background: transparent;
+  color: var(--accent);
+  border: none;
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.balanced-toggle button.is-on {
+  background: var(--accent);
+  color: var(--button-text);
+}
+
+.balanced-note {
+  margin: 0.35rem 0 0.6rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  background: rgba(0, 108, 103, 0.07);
+  border: 1px dashed var(--accent);
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
 /* ─── Lead / descripción de panel ─────────────────────── */
 
 .panel-lead {
@@ -669,6 +759,87 @@ h3 { margin-bottom: 0.35rem; }
   display: block;
   width: 100%;
   height: auto;
+}
+
+/* ─── Ladder linearised network ───────────────────── */
+
+.ladder-network {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.6rem;
+}
+
+.ladder-elem {
+  display: grid;
+  grid-template-columns: 5rem 1fr auto;
+  align-items: baseline;
+  gap: 0.65rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--card-bg);
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-size: 0.82rem;
+}
+
+.ladder-elem--series {
+  border-left: 3px solid var(--accent-2);
+}
+
+.ladder-elem--shunt {
+  border-left: 3px solid var(--accent);
+}
+
+.ladder-kind {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.ladder-label {
+  color: var(--ink);
+}
+
+.ladder-val {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* ─── Comparator panel ────────────────────────────── */
+
+.compare-grid {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.7rem;
+  grid-template-columns: 1fr;
+}
+
+.compare-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  background: var(--soft-bg);
+}
+
+.compare-card h4 {
+  margin: 0 0 0.4rem;
+  color: var(--accent);
+  font-size: 0.98rem;
+}
+
+.compare-metrics {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: 0.45rem;
+}
+
+.compare-metric {
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-size: 0.78rem;
+  padding: 0.22rem 0.55rem;
+  border-radius: 8px;
+  background: rgba(0, 108, 103, 0.08);
+  color: var(--accent);
 }
 
 /* ─── Responsive ─────────────────────────────────────── */

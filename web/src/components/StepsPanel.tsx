@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { designSteps, type StepsDesignParams } from '../api/client'
 import type { StepsDesignResult } from '../api/client'
 import type { SolutionStep } from '../types'
 import { CircuitSVG } from './CircuitSVG'
 import { useLang } from '../LangContext'
+import { useEscapeKey } from '../hooks/useEscapeKey'
+import { readInitialParams, useShareLink } from '../hooks/usePermalink'
+import { buildStepsTeX, downloadTeX } from '../utils/latex'
 
 type StepsTopology = StepsDesignParams['topology']
 
@@ -21,14 +24,34 @@ function parseDbList(s: string): number[] {
 
 export function StepsPanel({ onSteps }: StepsPanelProps) {
   const { tr } = useLang()
-  const [topology, setTopology] = useState<StepsTopology>('T_bridged')
-  const [Z0, setZ0] = useState('600')
-  const [Z1, setZ1] = useState('100')
-  const [Z2, setZ2] = useState('200')
-  const [dbStr, setDbStr] = useState('0, 3, 6, 12, 24')
+  const sectionRef = useRef<HTMLElement | null>(null)
+  const initial = readInitialParams('steps')
+  const [topology, setTopology] = useState<StepsTopology>(((initial?.topology as StepsTopology) ?? 'T_bridged'))
+  const [Z0, setZ0] = useState(initial?.Z0 ?? '600')
+  const [Z1, setZ1] = useState(initial?.Z1 ?? '100')
+  const [Z2, setZ2] = useState(initial?.Z2 ?? '200')
+  const [dbStr, setDbStr] = useState(initial?.list ?? '0, 3, 6, 12, 24')
   const [result, setResult] = useState<StepsDesignResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const { copied, share } = useShareLink('steps')
+
+  const clearResults = useCallback(() => {
+    setResult(null)
+    setError(null)
+    onSteps([])
+  }, [onSteps])
+
+  useEscapeKey(clearResults, sectionRef)
+
+  function handleShare() {
+    const sym = isSymmetric(topology)
+    share({ topology, Z0: sym ? Z0 : undefined, Z1: !sym ? Z1 : undefined, Z2: !sym ? Z2 : undefined, list: dbStr })
+  }
+  function handleExportTeX() {
+    if (!result) return
+    downloadTeX(`pasos-${result.topology}.tex`, buildStepsTeX(result))
+  }
 
   function handleTopologyChange(t: StepsTopology) {
     setTopology(t)
@@ -73,10 +96,18 @@ export function StepsPanel({ onSteps }: StepsPanelProps) {
   const stepsTopologies: StepsTopology[] = ['T_symmetric', 'pi_symmetric', 'T_asymmetric', 'pi_asymmetric', 'T_bridged']
 
   return (
-    <section className="panel">
+    <section className="panel" ref={sectionRef}>
       <div className="panel-title">
         <div>
           <h2>{tr.stepsTitle}</h2>
+        </div>
+        <div className="panel-actions">
+          <button type="button" className="ghost compact" onClick={handleShare}>
+            {copied ? tr.copied : tr.shareBtn}
+          </button>
+          <button type="button" className="ghost compact" onClick={handleExportTeX} disabled={!result}>
+            {tr.exportTexBtn}
+          </button>
         </div>
       </div>
       <div className="panel-body">

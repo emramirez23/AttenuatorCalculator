@@ -1156,3 +1156,221 @@ export async function designSteps(params: StepsDesignParams): Promise<StepsDesig
   return { topology, cells, steps, warnings: allWarnings }
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+//   MVP 6: Atenuador en escalera (ladder) — cascada T o π fusionando comunes
+// ═════════════════════════════════════════════════════════════════════════════
+
+export interface LadderDesignParams {
+  cellType: 'T_symmetric' | 'pi_symmetric'
+  Z0: number
+  dB_list: number[]   // attenuation of each cell, in dB
+}
+
+export interface LadderCell {
+  index: number
+  dB: number
+  K: number
+  R_series: number    // R1 series-arm for T; R3 series-arm for π
+  R_shunt: number     // R3 shunt for T; R1 shunt for π (each side)
+}
+
+export interface LadderElement {
+  kind: 'series' | 'shunt'
+  label: string       // human-readable label
+  value: number       // resistor value (Ω)
+  origin: string      // which cell(s) this came from
+}
+
+export interface LadderDesignResult {
+  cellType: 'T_symmetric' | 'pi_symmetric'
+  Z0: number
+  cells: LadderCell[]
+  network: LadderElement[]  // linearised ladder, alternating series–shunt
+  steps: SolutionStep[]
+  warnings: string[]
+}
+
+export async function designLadder(params: LadderDesignParams): Promise<LadderDesignResult> {
+  const { cellType, Z0, dB_list } = params
+  if (!dB_list || dB_list.length === 0) throw new Error('Ingresá al menos un paso.')
+  for (const v of dB_list) {
+    if (!isFinite(v) || v <= 0) throw new Error(`Paso inválido: ${v}. Debe ser > 0 dB.`)
+  }
+  if (Z0 <= 0) throw new Error('Z₀ debe ser positivo.')
+
+  const cells: LadderCell[] = []
+  for (let i = 0; i < dB_list.length; i++) {
+    const dB = dB_list[i]
+    const K = Math.pow(10, dB / 20)
+    if (cellType === 'T_symmetric') {
+      const R1 = Z0 * (K - 1) / (K + 1)
+      const R3 = (K * K - 1) > 0 ? Z0 * 2 * K / (K * K - 1) : Infinity
+      cells.push({ index: i + 1, dB, K, R_series: R1, R_shunt: R3 })
+    } else {
+      // π symmetric
+      const R3 = Z0 * (K * K - 1) / (2 * K)
+      const R1 = K > 1 ? Z0 * (K + 1) / (K - 1) : Infinity
+      cells.push({ index: i + 1, dB, K, R_series: R3, R_shunt: R1 })
+    }
+  }
+
+  // Build the linearised ladder:
+  //   T:  R1_1 — R3_1 — (R1_1 + R1_2) — R3_2 — (R1_2 + R1_3) — ... — R1_N
+  //   π:  R1_1 — R3_1 — (R1_1 ∥ R1_2) — R3_2 — ...                  — R1_N
+  const network: LadderElement[] = []
+  const N = cells.length
+  for (let i = 0; i < N; i++) {
+    if (cellType === 'T_symmetric') {
+      // Left arm of cell i (merge with right arm of previous cell)
+      let leftVal = cells[i].R_series
+      let label = `R1 (celda ${i + 1})`
+      let origin = `${i + 1}-izq`
+      if (i > 0) {
+        leftVal = cells[i - 1].R_series + cells[i].R_series
+        label = `R1 (${i}-der) + R1 (${i + 1}-izq)`
+        origin = `${i}-der + ${i + 1}-izq`
+      }
+      network.push({ kind: 'series', label, value: leftVal, origin })
+      network.push({ kind: 'shunt', label: `R3 (celda ${i + 1})`, value: cells[i].R_shunt, origin: `${i + 1}` })
+    } else {
+      // π: shunt arm of cell i (merge with previous cell's right shunt)
+      let leftVal = cells[i].R_shunt
+      let label = `R1 (celda ${i + 1})`
+      let origin = `${i + 1}-izq`
+      if (i > 0) {
+        const a = cells[i - 1].R_shunt
+        const b = cells[i].R_shunt
+        leftVal = (a * b) / (a + b)
+        label = `R1 (${i}-der) ∥ R1 (${i + 1}-izq)`
+        origin = `${i}-der ∥ ${i + 1}-izq`
+      }
+      network.push({ kind: 'shunt', label, value: leftVal, origin })
+      network.push({ kind: 'series', label: `R3 (celda ${i + 1})`, value: cells[i].R_series, origin: `${i + 1}` })
+    }
+  }
+  // Trailing arm of last cell
+  if (cellType === 'T_symmetric') {
+    network.push({ kind: 'series', label: `R1 (${N}-der)`, value: cells[N - 1].R_series, origin: `${N}-der` })
+  } else {
+    network.push({ kind: 'shunt', label: `R1 (${N}-der)`, value: cells[N - 1].R_shunt, origin: `${N}-der` })
+  }
+
+  const sumDB = dB_list.reduce((s, v) => s + v, 0)
+  const cellEqs: string[] = cells.map(c => {
+    if (cellType === 'T_symmetric') {
+      return `Celda ${c.index} — A = ${c.dB} dB: R1 = ${c.R_series.toFixed(2)} Ω, R3 = ${isFinite(c.R_shunt) ? c.R_shunt.toFixed(2) : '∞'} Ω`
+    }
+    return `Celda ${c.index} — A = ${c.dB} dB: R3 (serie) = ${c.R_series.toFixed(2)} Ω, R1 (shunt) = ${isFinite(c.R_shunt) ? c.R_shunt.toFixed(2) : '∞'} Ω`
+  })
+
+  const steps: SolutionStep[] = [
+    {
+      title: `Atenuador en escalera — celdas tipo ${cellType === 'T_symmetric' ? 'T' : 'π'}`,
+      explanation: `Z₀ = ${Z0} Ω, ${dB_list.length} celda(s) en cascada con pasos ${dB_list.join(', ')} dB (atenuación total = ${sumDB.toFixed(2)} dB).`,
+      equations: [],
+      result: null,
+      warnings: []
+    },
+    {
+      title: 'Diseño de celdas individuales',
+      explanation: 'Cada celda se diseña como un atenuador simétrico independiente con Z₀:',
+      equations: cellEqs,
+      result: null,
+      warnings: []
+    },
+    {
+      title: 'Fusión de resistores compartidos',
+      explanation: cellType === 'T_symmetric'
+        ? 'Entre celdas adyacentes, la rama serie de salida y la rama serie de entrada se suman (están en serie sobre el mismo riel).'
+        : 'Entre celdas adyacentes, la rama shunt de salida y la rama shunt de entrada quedan en paralelo (mismo nodo).',
+      equations: network.map(e => `${e.kind === 'series' ? '↔ Serie' : '↕ Shunt'}  ${e.label}: ${isFinite(e.value) ? e.value.toFixed(2) : '∞'} Ω`),
+      result: `Red equivalente con ${network.length} elementos.`,
+      warnings: []
+    }
+  ]
+
+  return { cellType, Z0, cells, network, steps, warnings: [] }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//   Comparador de topologías — T sym, π sym, T puenteado a misma Z₀ y A
+// ═════════════════════════════════════════════════════════════════════════════
+
+export interface CompareParams {
+  Z0: number
+  attenuation_dB: number
+  P_in?: number  // potencia de entrada en W (para calcular potencia disipada)
+}
+
+export interface CompareTopologyResult {
+  topology: 'T_symmetric' | 'pi_symmetric' | 'T_bridged'
+  resistors: Record<string, number>
+  maxR: number
+  P_dissipated: number  // potencia total disipada (W)
+}
+
+export interface CompareResult {
+  Z0: number
+  attenuation_dB: number
+  K: number
+  P_in: number
+  results: CompareTopologyResult[]
+  steps: SolutionStep[]
+}
+
+export async function compareTopologies(params: CompareParams): Promise<CompareResult> {
+  const { Z0, attenuation_dB } = params
+  const P_in = params.P_in ?? 1
+  if (Z0 <= 0) throw new Error('Z₀ debe ser positivo.')
+  if (attenuation_dB < 0) throw new Error('La atenuación debe ser ≥ 0 dB.')
+  if (P_in <= 0) throw new Error('La potencia de entrada debe ser positiva.')
+
+  const K = Math.pow(10, attenuation_dB / 20)
+  const N = K * K
+  // Total dissipated power assuming matched load: P_in - P_out = P_in (1 - 1/N)
+  const P_diss = P_in * (1 - 1 / N)
+
+  const tSym = await designAttenuator({ topology: 'T_symmetric', Z0, attenuation_dB })
+  const piSym = await designAttenuator({ topology: 'pi_symmetric', Z0, attenuation_dB })
+  const tBridged = await designAttenuator({ topology: 'T_bridged', Z0, attenuation_dB })
+
+  function maxFinite(rs: Record<string, number>): number {
+    let m = 0
+    for (const v of Object.values(rs)) if (isFinite(v) && v > m) m = v
+    return m
+  }
+
+  const results: CompareTopologyResult[] = [
+    { topology: 'T_symmetric',  resistors: tSym.resistors,    maxR: maxFinite(tSym.resistors),    P_dissipated: P_diss },
+    { topology: 'pi_symmetric', resistors: piSym.resistors,   maxR: maxFinite(piSym.resistors),   P_dissipated: P_diss },
+    { topology: 'T_bridged',    resistors: tBridged.resistors, maxR: maxFinite(tBridged.resistors), P_dissipated: P_diss }
+  ]
+
+  const steps: SolutionStep[] = [
+    {
+      title: 'Comparador de topologías',
+      explanation: `Para Z₀ = ${Z0} Ω y A = ${attenuation_dB} dB (K = ${K.toFixed(4)}, N = ${N.toFixed(4)}), se calculan tres topologías simétricas equivalentes y se contrasta su distribución de resistencias y disipación total.`,
+      equations: [
+        `Potencia de entrada P_in = ${P_in} W`,
+        `Potencia disipada total: P_diss = P_in · (1 − 1/N) = ${P_in} · (1 − 1/${N.toFixed(4)}) = ${P_diss.toFixed(4)} W`,
+        `(idéntica para las tres topologías porque la atenuación total es la misma)`
+      ],
+      result: null,
+      warnings: []
+    },
+    {
+      title: 'Resultados por topología',
+      explanation: '',
+      equations: results.map(r => {
+        const rs = Object.entries(r.resistors).map(([k, v]) => `${k}=${isFinite(v) ? v.toFixed(2) : '∞'}Ω`).join('  ')
+        return `${r.topology.padEnd(15)} → ${rs}   |   Max R = ${r.maxR.toFixed(2)} Ω`
+      }),
+      result: null,
+      warnings: []
+    }
+  ]
+
+  return { Z0, attenuation_dB, K, P_in, results, steps }
+}
+
+

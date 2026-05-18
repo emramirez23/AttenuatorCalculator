@@ -1,0 +1,13 @@
+[build]
+  base    = "web"
+  publish = "dist"
+  command = "npm run build"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# SPA fallback: every URL should serve the Vite-built index.html
+[[redirects]]
+  from   = "/*"
+  to    = "/index.html"
+  status = 200

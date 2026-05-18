@@ -1132,26 +1132,40 @@ export async function designSteps(params: StepsDesignParams): Promise<StepsDesig
     }
   }
 
-  const summaryEqs: string[] = []
-  for (const c of cells) {
-    const rs = Object.entries(c.resistors)
-      .map(([k, v]) => `${k}=${isFinite(v) ? v.toFixed(2) : '∞'}Ω`).join('  ')
-    summaryEqs.push(`A = ${c.dB} dB  (K = ${c.K.toFixed(4)})  →  ${rs}`)
-  }
+  // Build detailed steps: include full design steps for each cell
+  const steps: SolutionStep[] = []
 
   const explanation = isSym
     ? `Atenuador por pasos en topología ${topology}, con Z₀ = ${params.Z0} Ω. Se diseña un cuadripolo independiente por cada paso solicitado.`
     : `Atenuador por pasos en topología ${topology}, con Z₁ = ${params.Z1} Ω y Z₂ = ${params.Z2} Ω. Se diseña un cuadripolo independiente por cada paso.`
 
-  const steps: SolutionStep[] = [
-    {
-      title: 'Diseño por pasos',
-      explanation,
-      equations: summaryEqs,
-      result: `${cells.length} paso(s) diseñado(s).`,
-      warnings: allWarnings
+  steps.push({
+    title: 'Diseño por pasos — resumen',
+    explanation,
+    equations: cells.map(c => {
+      const rs = Object.entries(c.resistors)
+        .map(([k, v]) => `${k}=${isFinite(v) ? v.toFixed(2) : '∞'}Ω`).join('  ')
+      return `A = ${c.dB} dB  (K = ${c.K.toFixed(4)})  →  ${rs}`
+    }),
+    result: `${cells.length} paso(s) diseñado(s).`,
+    warnings: allWarnings
+  })
+
+  // Include full design steps for each cell
+  for (let i = 0; i < cells.length; i++) {
+    const c = cells[i]
+    if (isSym) {
+      const res = await designAttenuator({ topology, Z0: params.Z0, attenuation_dB: c.dB })
+      for (const s of res.steps) {
+        steps.push({ ...s, title: `Paso ${i + 1} (${c.dB} dB) — ${s.title}` })
+      }
+    } else {
+      const res = await designAttenuator({ topology, Z1: params.Z1, Z2: params.Z2, attenuation_dB: c.dB })
+      for (const s of res.steps) {
+        steps.push({ ...s, title: `Paso ${i + 1} (${c.dB} dB) — ${s.title}` })
+      }
     }
-  ]
+  }
 
   return { topology, cells, steps, warnings: allWarnings }
 }
@@ -1256,12 +1270,6 @@ export async function designLadder(params: LadderDesignParams): Promise<LadderDe
   }
 
   const sumDB = dB_list.reduce((s, v) => s + v, 0)
-  const cellEqs: string[] = cells.map(c => {
-    if (cellType === 'T_symmetric') {
-      return `Celda ${c.index} — A = ${c.dB} dB: R1 = ${c.R_series.toFixed(2)} Ω, R3 = ${isFinite(c.R_shunt) ? c.R_shunt.toFixed(2) : '∞'} Ω`
-    }
-    return `Celda ${c.index} — A = ${c.dB} dB: R3 (serie) = ${c.R_series.toFixed(2)} Ω, R1 (shunt) = ${isFinite(c.R_shunt) ? c.R_shunt.toFixed(2) : '∞'} Ω`
-  })
 
   const steps: SolutionStep[] = [
     {
@@ -1270,24 +1278,93 @@ export async function designLadder(params: LadderDesignParams): Promise<LadderDe
       equations: [],
       result: null,
       warnings: []
-    },
-    {
-      title: 'Diseño de celdas individuales',
-      explanation: 'Cada celda se diseña como un atenuador simétrico independiente con Z₀:',
-      equations: cellEqs,
-      result: null,
-      warnings: []
-    },
-    {
-      title: 'Fusión de resistores compartidos',
-      explanation: cellType === 'T_symmetric'
-        ? 'Entre celdas adyacentes, la rama serie de salida y la rama serie de entrada se suman (están en serie sobre el mismo riel).'
-        : 'Entre celdas adyacentes, la rama shunt de salida y la rama shunt de entrada quedan en paralelo (mismo nodo).',
-      equations: network.map(e => `${e.kind === 'series' ? '↔ Serie' : '↕ Shunt'}  ${e.label}: ${isFinite(e.value) ? e.value.toFixed(2) : '∞'} Ω`),
-      result: `Red equivalente con ${network.length} elementos.`,
-      warnings: []
     }
   ]
+
+  // Detailed calculation for each cell
+  for (const c of cells) {
+    const K = c.K
+    const alpha = Math.log(K)
+    if (cellType === 'T_symmetric') {
+      steps.push({
+        title: `Celda ${c.index} — A = ${c.dB} dB (T simétrico)`,
+        explanation: `Diseño de la celda individual con Z₀ = ${Z0} Ω:`,
+        equations: [
+          `K = 10^(${c.dB}/20) = ${K.toFixed(4)}`,
+          `α = ln(K) = ln(${K.toFixed(4)}) = ${alpha.toFixed(4)} Nepers`,
+          ``,
+          `R1 = Z₀ · (K − 1)/(K + 1)`,
+          `R1 = ${Z0} · (${K.toFixed(4)} − 1)/(${K.toFixed(4)} + 1) = ${Z0} · ${(K - 1).toFixed(4)}/${(K + 1).toFixed(4)}`,
+          `R1 = ${c.R_series.toFixed(2)} Ω`,
+          ``,
+          `R3 = Z₀ · 2K/(K² − 1)`,
+          `R3 = ${Z0} · 2×${K.toFixed(4)}/(${(K * K).toFixed(4)} − 1) = ${Z0} · ${(2 * K).toFixed(4)}/${(K * K - 1).toFixed(4)}`,
+          `R3 = ${isFinite(c.R_shunt) ? c.R_shunt.toFixed(2) + ' Ω' : '∞'}`,
+          ``,
+          `Verificación hiperbólica:`,
+          `R1 = Z₀ · tanh(α/2) = ${Z0} · tanh(${(alpha / 2).toFixed(4)}) = ${(Z0 * Math.tanh(alpha / 2)).toFixed(2)} Ω  ✓`,
+          `R3 = Z₀ / sinh(α) = ${Z0} / sinh(${alpha.toFixed(4)}) = ${(Z0 / Math.sinh(alpha)).toFixed(2)} Ω  ✓`
+        ],
+        result: `R1 = ${c.R_series.toFixed(2)} Ω, R3 = ${isFinite(c.R_shunt) ? c.R_shunt.toFixed(2) + ' Ω' : '∞'}`,
+        warnings: []
+      })
+    } else {
+      steps.push({
+        title: `Celda ${c.index} — A = ${c.dB} dB (π simétrico)`,
+        explanation: `Diseño de la celda individual con Z₀ = ${Z0} Ω:`,
+        equations: [
+          `K = 10^(${c.dB}/20) = ${K.toFixed(4)}`,
+          `α = ln(K) = ln(${K.toFixed(4)}) = ${alpha.toFixed(4)} Nepers`,
+          ``,
+          `R3 (serie) = Z₀ · (K² − 1)/(2K)`,
+          `R3 = ${Z0} · (${(K * K).toFixed(4)} − 1)/(2×${K.toFixed(4)}) = ${Z0} · ${(K * K - 1).toFixed(4)}/${(2 * K).toFixed(4)}`,
+          `R3 = ${c.R_series.toFixed(2)} Ω`,
+          ``,
+          `R1 (shunt) = Z₀ · (K + 1)/(K − 1)`,
+          `R1 = ${Z0} · (${K.toFixed(4)} + 1)/(${K.toFixed(4)} − 1) = ${Z0} · ${(K + 1).toFixed(4)}/${(K - 1).toFixed(4)}`,
+          `R1 = ${isFinite(c.R_shunt) ? c.R_shunt.toFixed(2) + ' Ω' : '∞'}`,
+          ``,
+          `Verificación hiperbólica:`,
+          `R3 = Z₀ · sinh(α) = ${Z0} · sinh(${alpha.toFixed(4)}) = ${(Z0 * Math.sinh(alpha)).toFixed(2)} Ω  ✓`,
+          `R1 = Z₀ / tanh(α/2) = ${Z0} / tanh(${(alpha / 2).toFixed(4)}) = ${(Z0 / Math.tanh(alpha / 2)).toFixed(2)} Ω  ✓`
+        ],
+        result: `R3 = ${c.R_series.toFixed(2)} Ω, R1 = ${isFinite(c.R_shunt) ? c.R_shunt.toFixed(2) + ' Ω' : '∞'}`,
+        warnings: []
+      })
+    }
+  }
+
+  // Fusion explanation
+  const fusionEqs: string[] = []
+  for (let i = 0; i < network.length; i++) {
+    const e = network[i]
+    fusionEqs.push(`${e.kind === 'series' ? '↔ Serie' : '↕ Shunt'}  ${e.label}: ${isFinite(e.value) ? e.value.toFixed(2) : '∞'} Ω`)
+  }
+  // Show fusion calculations between adjacent cells
+  if (cells.length > 1) {
+    fusionEqs.push('')
+    fusionEqs.push('Cálculos de fusión entre celdas adyacentes:')
+    for (let i = 0; i < cells.length - 1; i++) {
+      if (cellType === 'T_symmetric') {
+        const sum = cells[i].R_series + cells[i + 1].R_series
+        fusionEqs.push(`Celdas ${i + 1}↔${i + 2}: R1(${i + 1}-der) + R1(${i + 2}-izq) = ${cells[i].R_series.toFixed(2)} + ${cells[i + 1].R_series.toFixed(2)} = ${sum.toFixed(2)} Ω`)
+      } else {
+        const a = cells[i].R_shunt, b = cells[i + 1].R_shunt
+        const par = (a * b) / (a + b)
+        fusionEqs.push(`Celdas ${i + 1}↔${i + 2}: R1(${i + 1}-der) ∥ R1(${i + 2}-izq) = ${a.toFixed(2)} ∥ ${b.toFixed(2)} = ${a.toFixed(2)}×${b.toFixed(2)}/(${a.toFixed(2)}+${b.toFixed(2)}) = ${par.toFixed(2)} Ω`)
+      }
+    }
+  }
+
+  steps.push({
+    title: 'Fusión de resistores compartidos',
+    explanation: cellType === 'T_symmetric'
+      ? 'Entre celdas adyacentes, la rama serie de salida y la rama serie de entrada se suman (están en serie sobre el mismo riel).'
+      : 'Entre celdas adyacentes, la rama shunt de salida y la rama shunt de entrada quedan en paralelo (mismo nodo).',
+    equations: fusionEqs,
+    result: `Red equivalente con ${network.length} elementos.`,
+    warnings: []
+  })
 
   return { cellType, Z0, cells, network, steps, warnings: [] }
 }
@@ -1348,27 +1425,48 @@ export async function compareTopologies(params: CompareParams): Promise<CompareR
 
   const steps: SolutionStep[] = [
     {
-      title: 'Comparador de topologías',
-      explanation: `Para Z₀ = ${Z0} Ω y A = ${attenuation_dB} dB (K = ${K.toFixed(4)}, N = ${N.toFixed(4)}), se calculan tres topologías simétricas equivalentes y se contrasta su distribución de resistencias y disipación total.`,
+      title: 'Comparador de topologías — datos comunes',
+      explanation: `Para Z₀ = ${Z0} Ω y A = ${attenuation_dB} dB, se calculan tres topologías simétricas equivalentes.`,
       equations: [
+        `K = 10^(A/20) = 10^(${attenuation_dB}/20) = ${K.toFixed(4)}`,
+        `N = K² = ${K.toFixed(4)}² = ${N.toFixed(4)}`,
+        ``,
         `Potencia de entrada P_in = ${P_in} W`,
-        `Potencia disipada total: P_diss = P_in · (1 − 1/N) = ${P_in} · (1 − 1/${N.toFixed(4)}) = ${P_diss.toFixed(4)} W`,
+        `Potencia de salida P_out = P_in / N = ${P_in} / ${N.toFixed(4)} = ${(P_in / N).toFixed(4)} W`,
+        `Potencia disipada total: P_diss = P_in − P_out = P_in · (1 − 1/N)`,
+        `P_diss = ${P_in} · (1 − 1/${N.toFixed(4)}) = ${P_in} · ${(1 - 1 / N).toFixed(4)} = ${P_diss.toFixed(4)} W`,
         `(idéntica para las tres topologías porque la atenuación total es la misma)`
       ],
       result: null,
       warnings: []
-    },
-    {
-      title: 'Resultados por topología',
-      explanation: '',
-      equations: results.map(r => {
-        const rs = Object.entries(r.resistors).map(([k, v]) => `${k}=${isFinite(v) ? v.toFixed(2) : '∞'}Ω`).join('  ')
-        return `${r.topology.padEnd(15)} → ${rs}   |   Max R = ${r.maxR.toFixed(2)} Ω`
-      }),
-      result: null,
-      warnings: []
     }
   ]
+
+  // Include full design steps for each topology
+  const topoDesigns = [
+    { label: 'T simétrico', res: tSym },
+    { label: 'π simétrico', res: piSym },
+    { label: 'T puenteado', res: tBridged }
+  ]
+  for (const { label, res } of topoDesigns) {
+    for (const s of res.steps) {
+      steps.push({ ...s, title: `${label} — ${s.title}` })
+    }
+  }
+
+  // Comparative summary
+  steps.push({
+    title: 'Cuadro comparativo',
+    explanation: 'Resumen de las tres topologías con métricas clave:',
+    equations: results.map(r => {
+      const _names: Record<string, string> = { T_symmetric: 'T simétrico', pi_symmetric: 'π simétrico', T_bridged: 'T puenteado' }
+      const name = _names[r.topology] ?? r.topology
+      const rs = Object.entries(r.resistors).map(([k, v]) => `${k}=${isFinite(v) ? v.toFixed(2) : '∞'}Ω`).join('  ')
+      return `${name}: ${rs}  |  Max R = ${r.maxR.toFixed(2)} Ω  |  P_diss = ${r.P_dissipated.toFixed(4)} W`
+    }),
+    result: null,
+    warnings: []
+  })
 
   return { Z0, attenuation_dB, K, P_in, results, steps }
 }

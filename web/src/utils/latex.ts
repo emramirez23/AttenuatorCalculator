@@ -89,7 +89,9 @@ const unicodeAscii: Array<[string | RegExp, string]> = [
   [/∞/g, '$\\infty$'],
   [/✓/g, '\\checkmark'],
   [/⚠/g, '$\\triangleright$'],
-  [/−/g, '-']   // Unicode minus → ASCII
+  [/−/g, '-'],   // Unicode minus → ASCII
+  [/—/g, '---'],  // Em dash
+  [/–/g, '--']    // En dash
 ]
 
 function escText(s: string): string {
@@ -155,6 +157,13 @@ function toAscii(s: string): string {
     .replace(/−/g, '-')
     .replace(/✓/g, 'OK')
     .replace(/⚠/g, '!')
+    // Accented vowels → ASCII (verbatim can't handle UTF-8 accents)
+    .replace(/á/g, 'a').replace(/é/g, 'e').replace(/í/g, 'i')
+    .replace(/ó/g, 'o').replace(/ú/g, 'u').replace(/ñ/g, 'n')
+    .replace(/Á/g, 'A').replace(/É/g, 'E').replace(/Í/g, 'I')
+    .replace(/Ó/g, 'O').replace(/Ú/g, 'U').replace(/Ñ/g, 'N')
+    // Dashes
+    .replace(/—/g, '--').replace(/–/g, '-')
 }
 
 function preamble(title: string): string {
@@ -550,7 +559,7 @@ export function buildCompareTeX(res: CompareResult): string {
   out.push(`\\noindent $Z_0 = ${roundZ(res.Z0)}\\,\\Omega$\\quad $A = ${res.attenuation_dB}$\\,dB\\quad $K = ${res.K.toFixed(4)}$\\quad $P_{\\text{in}} = ${res.P_in}$\\,W\\par`)
   out.push('')
   for (const r of res.results) {
-    out.push(`\\section*{${PRETTY_TOPOLOGY[r.topology] ?? r.topology}}`)
+    out.push(`\\section*{${escText(PRETTY_TOPOLOGY[r.topology] ?? r.topology)}}`)
     out.push(tikzForTopology(r.topology, r.resistors, res.Z0, res.Z0, false))
     out.push(resistorListLatex(r.resistors))
     out.push(`\\noindent\\textbf{Max R:} $${r.maxR.toFixed(2)}\\,\\Omega$\\quad \\textbf{P disipada total:} $${r.P_dissipated.toFixed(4)}$\\,W\\par`)

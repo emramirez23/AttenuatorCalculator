@@ -2,6 +2,8 @@
 
 Herramienta educativa interactiva para el diseño, simulación y resolución paso a paso de atenuadores de radiofrecuencia (RF) y adaptadores de impedancia de pérdidas mínimas. Este proyecto fue desarrollado para la cátedra de **Teoría de Circuitos II** en la **Universidad Tecnológica Nacional (UTN) - Facultad Regional Avellaneda**.
 
+Sitio online: https://attenuatorcalculator.netlify.app/
+
 ## Características principales
 
 * **Conversión de Unidades**: Conversión bidireccional inmediata entre dB, factor de atenuación lineal ($K$), y Népers ($Np$).
